@@ -1,0 +1,4 @@
+LD V0, 5
+LD V1, 10
+ADD V0, V1
+SAVE V0
