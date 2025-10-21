@@ -10,7 +10,7 @@ import (
 type CPU struct {
 	v          [16]byte // V0-VF registers
 	i          uint16   // address register
-	pc         uint16   // program counter
+	pc         *PC      // program counter
 	stack      [16]uint16
 	sp         byte // StackPointer
 	delayTimer byte
@@ -22,10 +22,12 @@ type CPU struct {
 }
 
 func NewCPU(mem *memory.Memory) *CPU {
+	pc := NewPC()
+
 	return &CPU{
 		v:          [16]byte{},
 		i:          0x300,
-		pc:         0x200,
+		pc:         pc,
 		stack:      [16]uint16{},
 		delayTimer: 0,
 		soundTimer: 0,
@@ -37,18 +39,16 @@ func NewCPU(mem *memory.Memory) *CPU {
 func (c *CPU) step() {
 	memorySize := c.memory.Size()
 
-	if c.pc >= memorySize-1 {
+	if c.pc.Current() >= memorySize-1 {
 		c.running = false
 	}
 
 	c.cu.ExecuteCycle(c)
+	c.pc.Count()
 
-	if c.pc+2 >= memorySize {
+	if c.pc.Current() >= memorySize {
 		c.running = false
-		return
 	}
-
-	c.pc += 2
 }
 
 func (c *CPU) updateTimers() {

@@ -8,8 +8,8 @@ type ControlUnit struct{}
 
 // Fetch returns opcode from actual PC
 func (c *ControlUnit) fetch(cpu *CPU) Opcode {
-	high := uint16(cpu.memory.Read(cpu.pc))
-	low := uint16(cpu.memory.Read(cpu.pc + 1))
+	high := uint16(cpu.memory.Read(cpu.pc.Current()))
+	low := uint16(cpu.memory.Read(cpu.pc.Current() + 1))
 
 	//fmt.Printf("high: 0x%04X | low: 0x%04X\n", high, low)
 
@@ -36,7 +36,7 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		c.handle0Group(cpu, opcode)
 	case 0x1000:
 		fmt.Println("JUMP NNN")
-		cpu.pc = opcode.NNN
+		cpu.pc.JumpTo(opcode.NNN)
 	case 0x2000:
 		fmt.Println("0x2000")
 	case 0x3000:
@@ -78,23 +78,6 @@ func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 		fmt.Println("Clear")
 	case 0xEE:
 		fmt.Println("Return")
-	}
-}
-
-func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
-	x := uint16(opcode.X)
-
-	switch opcode.NN {
-	case 0x55: // FX55
-		fmt.Printf("SAVE V%d\n", opcode.X)
-		for i := uint16(0); i <= x; i++ {
-			cpu.memory.Write(cpu.i+i, cpu.v[i])
-		}
-	case 0x65: // FX65
-		fmt.Printf("LOAD V%d\n", opcode.X)
-		for i := uint16(0); i <= x; i++ {
-			cpu.v[i] = cpu.memory.Read(cpu.i + i)
-		}
 	}
 }
 
@@ -145,5 +128,22 @@ func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
 		fmt.Printf("V%d <<= V%d\n", opcode.X, opcode.Y)
 		cpu.v[0xF] = (cpu.v[opcode.X] & 0x80) >> 7
 		cpu.v[opcode.X] <<= 1
+	}
+}
+
+func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
+	x := uint16(opcode.X)
+
+	switch opcode.NN {
+	case 0x55: // FX55
+		fmt.Printf("SAVE V%d\n", opcode.X)
+		for i := uint16(0); i <= x; i++ {
+			cpu.memory.Write(cpu.i+i, cpu.v[i])
+		}
+	case 0x65: // FX65
+		fmt.Printf("LOAD V%d\n", opcode.X)
+		for i := uint16(0); i <= x; i++ {
+			cpu.v[i] = cpu.memory.Read(cpu.i + i)
+		}
 	}
 }
