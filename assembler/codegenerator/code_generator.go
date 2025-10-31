@@ -1,0 +1,129 @@
+package codegenerator
+
+import (
+	"github.com/xoesae/chip8/assembler/lexer/token"
+	"github.com/xoesae/chip8/assembler/parser"
+)
+
+type LabelMap map[string]uint32
+
+type AddressCounter struct {
+	pos uint32
+}
+
+func (a *AddressCounter) Pos() uint32 {
+	return a.pos
+}
+
+func (a *AddressCounter) SetPos(pos uint32) {
+	a.pos = pos
+}
+
+func (a *AddressCounter) Advance() {
+	a.pos++
+}
+
+type CodeGenerator struct {
+	addressCounter AddressCounter
+	labels         LabelMap
+	opcodes        []byte
+}
+
+func (c *CodeGenerator) appendOpcode(msb byte, lsb byte) {
+	c.opcodes[c.addressCounter.Pos()] = msb // set MSB
+	c.addressCounter.Advance()
+
+	c.opcodes[c.addressCounter.Pos()] = lsb // set LSB
+	c.addressCounter.Advance()
+}
+
+func (c *CodeGenerator) processLabel(expression parser.Expression) {
+	label := expression[0].(token.Label)
+	if _, exists := c.labels[label.Value]; exists {
+		panic("repeated label: " + label.Value) // TODO: improve errors
+	}
+	c.labels[label.Value] = c.addressCounter.Pos()
+}
+
+func (c *CodeGenerator) processDirective(expression parser.Expression) {
+	directive := expression[0].(token.Directive)
+
+	switch directive.Value {
+	case string(token.Org):
+		addr := expression[1].(token.NumericLiteral)
+		c.addressCounter.SetPos(addr.Value)
+	case string(token.Db):
+		for i := 1; i < len(expression); i++ {
+			literal := expression[i].(token.NumericLiteral)
+			// set the byte on the current addres
+			c.opcodes[c.addressCounter.Pos()] = byte(literal.Value)
+			c.addressCounter.Advance()
+		}
+	}
+}
+
+func (c *CodeGenerator) processInstruction(expression parser.Expression) {
+	instr := expression[0].(token.Instruction)
+	switch instr.Value {
+	case string(token.CLS):
+		c.appendOpcode(0x00, 0xE0)
+	case string(token.RET):
+		c.appendOpcode(0x00, 0xEE)
+	case string(token.JP):
+		c.processJumpInstruction(0x10, expression)
+	case string(token.CALL):
+		c.processJumpInstruction(0x20, expression)
+	case string(token.SE):
+		c.processSEInstruction(0x30, 0x50, expression)
+	case string(token.SNE):
+		panic("todo: implement this instruction")
+	case string(token.LD):
+		panic("todo: implement this instruction")
+	case string(token.ADD):
+		panic("todo: implement this instruction")
+	case string(token.SUB):
+		panic("todo: implement this instruction")
+	case string(token.SUBN):
+		panic("todo: implement this instruction")
+	case string(token.OR):
+		panic("todo: implement this instruction")
+	case string(token.AND):
+		panic("todo: implement this instruction")
+	case string(token.XOR):
+		panic("todo: implement this instruction")
+	case string(token.SHR):
+		panic("todo: implement this instruction")
+	case string(token.SHL):
+		panic("todo: implement this instruction")
+	case string(token.RND):
+		panic("todo: implement this instruction")
+	case string(token.DRW):
+		panic("todo: implement this instruction")
+	case string(token.SKP):
+		panic("todo: implement this instruction")
+	case string(token.SKNP):
+		panic("todo: implement this instruction")
+	case string(token.SYS):
+		panic("todo: implement this instruction")
+	}
+}
+
+func (c *CodeGenerator) Generate(expressions []parser.Expression) []byte {
+	for _, expression := range expressions {
+		if _, ok := expression[0].(token.Label); ok {
+			c.processLabel(expression)
+		}
+
+		if _, ok := expression[0].(token.Directive); ok {
+			c.processDirective(expression)
+		}
+
+		if _, ok := expression[0].(token.Instruction); ok {
+			c.processInstruction(expression)
+		}
+
+		panic("invalid expression")
+	}
+
+	return c.opcodes
+}

@@ -1,0 +1,10 @@
+LD I, 0x300    ; endereço do sprite
+LD V0, 0       ; X = 0
+LD V1, 10      ; Y = 10 (linha fixa)
+LOOP:
+    CLS        ; limpa a tela
+    DRW V0, V1, 1  ; desenha 1 linha do sprite
+    ADD V0, 1      ; move X para a direita
+    SE V0, 64      ; se passou da largura da tela, reinicia
+        LD V0, 0
+    JP LOOP        ; volta para o loop

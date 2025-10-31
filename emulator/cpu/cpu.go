@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xoesae/chip8/memory"
+	"github.com/xoesae/chip8/emulator/io/display"
+	"github.com/xoesae/chip8/emulator/memory"
 )
 
 type CPU struct {
@@ -17,11 +18,12 @@ type CPU struct {
 	soundTimer byte
 	memory     *memory.Memory
 	cu         *ControlUnit
+	display    *display.Display
 
 	running bool
 }
 
-func NewCPU(mem *memory.Memory) *CPU {
+func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
 	pc := NewPC()
 
 	return &CPU{
@@ -32,6 +34,7 @@ func NewCPU(mem *memory.Memory) *CPU {
 		delayTimer: 0,
 		soundTimer: 0,
 		memory:     mem,
+		display:    d,
 		running:    false,
 	}
 }
@@ -74,6 +77,7 @@ func (c *CPU) Run(fps int) {
 		select {
 		case <-cpuTick.C:
 			c.step()
+			c.display.Refresh()
 		case <-timerTick.C:
 			c.updateTimers()
 		}

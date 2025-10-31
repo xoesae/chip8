@@ -1,0 +1,18 @@
+            org $200
+
+start
+            LD I, #num1      ; Point I to the `1` sprite
+            LD V0, 16        ; Load the x value of the sprite
+            LD V1, 16        ; Load the y value of the sprite
+
+            DRW V0, V1, 5    ; Draw the sprite
+
+end         JP #end          ; loop forever
+
+; Sprites
+num1
+            db $20 $60 $20 $20 $70
+
+
+
+            

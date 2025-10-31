@@ -64,7 +64,23 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0xC000:
 		fmt.Println("0xC000")
 	case 0xD000:
-		fmt.Println("0xD000")
+		//fmt.Println("0xD000")
+		// Draw
+		vx := cpu.v[opcode.X]
+		vy := cpu.v[opcode.Y]
+
+		sprite := make([]byte, uint16(opcode.N))
+		for i := uint16(0); i < uint16(opcode.N); i++ {
+			sprite[i] = cpu.memory.Read(cpu.i + i)
+		}
+
+		collision := cpu.display.DrawSprite(int(vx), int(vy), sprite)
+
+		if collision {
+			cpu.v[0xF] = 1
+		} else {
+			cpu.v[0xF] = 0
+		}
 	case 0xE000:
 		fmt.Println("0xE000")
 	case 0xF000:
@@ -75,7 +91,7 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 	switch opcode.Raw & 0x00FF {
 	case 0xE0:
-		fmt.Println("Clear")
+		cpu.display.Clear()
 	case 0xEE:
 		fmt.Println("Return")
 	}
