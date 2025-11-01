@@ -22,7 +22,7 @@
 - [x] ANNN
 - [ ] BNNN
 - [x] CXNN
-- [ ] DXYN
+- [x] DXYN
 - [ ] EX9E
 - [ ] EXA1
 - [x] FX07

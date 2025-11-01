@@ -420,3 +420,36 @@ func (c *CodeGenerator) processRNDInstruction(expression parser.Expression) {
 	lsb := byte(num.Value)
 	c.appendOpcode(msb, lsb)
 }
+
+func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
+	// DRW Vx, Vy, nibble | DXYN
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid DRW instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid DRW instruction")
+	}
+
+	vy, ok := expression[2].(token.Register)
+	if !ok {
+		panic("invalid DRW instruction")
+	}
+	if vy.Value[0] != 'V' {
+		panic("invalid DRW instruction")
+	}
+
+	num, ok := expression[3].(token.NumericLiteral)
+	if !ok {
+		panic("invalid DRW instruction")
+	}
+
+	x := vx.Value[1]
+	y := vy.Value[1]
+	n := uint8(num.Value)
+
+	msb := 0xD0 | x
+	lsb := (y << 4) | n
+	c.appendOpcode(msb, lsb)
+}
