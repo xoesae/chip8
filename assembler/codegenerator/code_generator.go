@@ -84,7 +84,7 @@ func (c *CodeGenerator) processInstruction(expression parser.Expression) {
 	case string(token.SUB):
 		c.processSUBInstruction(expression)
 	case string(token.SUBN):
-		panic("todo: implement this instruction")
+		c.processSUBNInstruction(expression)
 	case string(token.OR):
 		panic("todo: implement this instruction")
 	case string(token.AND):
