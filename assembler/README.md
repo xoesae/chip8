@@ -17,7 +17,7 @@
 - [x] 8XY5
 - [x] 8XY6
 - [x] 8XY7
-- [ ] 8XYE
+- [x] 8XYE
 - [ ] 9XY0
 - [x] ANNN
 - [ ] BNNN

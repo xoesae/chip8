@@ -368,3 +368,29 @@ func (c *CodeGenerator) processSHRInstruction(expression parser.Expression) {
 	lsb := (y << 4) | 0x6
 	c.appendOpcode(msb, lsb)
 }
+
+func (c *CodeGenerator) processSHLInstruction(expression parser.Expression) {
+	// SHL Vx, Vy | 8XYE
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid SHR instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid SHR instruction")
+	}
+
+	vy, ok := expression[2].(token.Register)
+	if !ok {
+		panic("invalid SHR instruction")
+	}
+	if vy.Value[0] != 'V' {
+		panic("invalid SHR instruction")
+	}
+
+	x := vx.Value[1]
+	y := vy.Value[1]
+	msb := 0x80 | x
+	lsb := (y << 4) | 0xE
+	c.appendOpcode(msb, lsb)
+}
