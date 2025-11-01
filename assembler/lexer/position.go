@@ -7,24 +7,24 @@ type Position struct {
 	column int
 }
 
-func (p *Position) Format() string {
+func (p *Position) format() string {
 	return fmt.Sprintf("%d:%d", p.line, p.column)
 }
 
-func (p *Position) NextColumn() {
+func (p *Position) nextColumn() {
 	p.column++
 }
 
-func (p *Position) PreviousColumn() {
+func (p *Position) previousColumn() {
 	p.column--
 }
 
-func (p *Position) NextLine() {
+func (p *Position) nextLine() {
 	p.line++
 	p.column = 1
 }
 
-func (p *Position) PreviousLine() {
+func (p *Position) previousLine() {
 	p.line--
 	p.column = 1
 }

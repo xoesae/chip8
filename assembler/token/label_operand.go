@@ -18,7 +18,7 @@ func (l LabelOperand) Format() string {
 }
 
 func IsLabelOperand(word string) bool {
-	return strings.HasPrefix(word, "#") && len(word) > 1
+	return strings.HasPrefix(word, "#") && len(word) > 1 && !strings.HasPrefix(word[1:], "#")
 }
 
 func ParseLabelOperand(word string) string {

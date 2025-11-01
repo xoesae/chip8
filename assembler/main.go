@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/xoesae/chip8/assembler/lexer"
 	"github.com/xoesae/chip8/assembler/parser"
@@ -16,12 +15,8 @@ func main() {
 	}
 
 	// lexer
-	lxr := lexer.NewLexer(strings.NewReader(string(input)))
+	lxr := lexer.NewLexer(string(input))
 	tokens := lxr.Lex()
-
-	//for _, t := range tokens {
-	//	fmt.Println(t.Format())
-	//}
 
 	// parser
 	psr := parser.NewParser(tokens)

@@ -12,7 +12,3 @@ end         JP #end          ; loop forever
 ; Sprites
 num1
             db $20 $60 $20 $20 $70
-
-
-
-            

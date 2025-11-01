@@ -24,7 +24,6 @@ const (
 	DRW  InstructionType = "DRW"
 	SKP  InstructionType = "SKP"
 	SKNP InstructionType = "SKNP"
-	SYS  InstructionType = "SYS"
 )
 
 type Instruction struct {
@@ -78,8 +77,6 @@ func IsInstruction(t string) bool {
 	case string(SKP):
 		return true
 	case string(SKNP):
-		return true
-	case string(SYS):
 		return true
 	default:
 		return false

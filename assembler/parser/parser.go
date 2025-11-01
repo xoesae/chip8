@@ -4,8 +4,6 @@ import (
 	"github.com/xoesae/chip8/assembler/token"
 )
 
-type Expression []token.Token
-
 func isOperand(t token.Token) bool {
 	switch t.(type) {
 	case token.Register, token.NumericLiteral, token.LabelOperand:
@@ -36,18 +34,18 @@ func (p *Parser) canConsume() bool {
 	return p.pos < p.size
 }
 
-func (p *Parser) parseLabel() (Expression, bool) {
+func (p *Parser) parseLabel() (token.Expression, bool) {
 	if t, ok := p.peek().(token.Label); ok {
 		p.advance()
-		return Expression{t}, true
+		return token.Expression{t}, true
 	}
 
 	return nil, false
 }
 
-func (p *Parser) parseDirective() (Expression, bool) {
+func (p *Parser) parseDirective() (token.Expression, bool) {
 	if t, ok := p.peek().(token.Directive); ok {
-		expr := Expression{t}
+		expr := token.Expression{t}
 		p.advance()
 
 		for p.canConsume() {
@@ -65,9 +63,9 @@ func (p *Parser) parseDirective() (Expression, bool) {
 	return nil, false
 }
 
-func (p *Parser) parseInstruction() (Expression, bool) {
+func (p *Parser) parseInstruction() (token.Expression, bool) {
 	if t, ok := p.peek().(token.Instruction); ok {
-		expr := Expression{t}
+		expr := token.Expression{t}
 		p.advance()
 
 		// first
@@ -94,8 +92,8 @@ func (p *Parser) parseInstruction() (Expression, bool) {
 	return nil, false
 }
 
-func (p *Parser) Parse() []Expression {
-	var expressions []Expression
+func (p *Parser) Parse() []token.Expression {
+	var expressions []token.Expression
 
 	for p.canConsume() {
 		if expr, ok := p.parseDirective(); ok {

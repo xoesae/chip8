@@ -3,3 +3,6 @@ compile:
 
 emulate:
 	go run emulator/main.go rom.ch8
+
+test:
+	go test ./...

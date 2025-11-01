@@ -3,7 +3,7 @@ package lexer
 import (
 	"bufio"
 	"io"
-	"strings"
+	strings "strings"
 	"unicode"
 
 	"github.com/xoesae/chip8/assembler/token"
@@ -14,7 +14,9 @@ type Lexer struct {
 	reader *bufio.Reader
 }
 
-func NewLexer(reader io.Reader) *Lexer {
+func NewLexer(input string) *Lexer {
+	reader := strings.NewReader(input)
+
 	return &Lexer{
 		pos:    Position{line: 1, column: 1},
 		reader: bufio.NewReader(reader),
@@ -23,13 +25,13 @@ func NewLexer(reader io.Reader) *Lexer {
 
 func (l *Lexer) isEOF() bool {
 	_, _, err := l.reader.ReadRune()
-	l.pos.NextColumn()
+	l.pos.nextColumn()
 	if err == io.EOF {
 		return true
 	}
 
 	err = l.reader.UnreadRune()
-	l.pos.PreviousColumn()
+	l.pos.previousColumn()
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +45,7 @@ func (l *Lexer) readWord() string {
 	for {
 		// read current rune (char)
 		char, _, err := l.reader.ReadRune()
-		l.pos.NextColumn()
+		l.pos.nextColumn()
 
 		if err == io.EOF {
 			return "EOF"
@@ -59,14 +61,14 @@ func (l *Lexer) readWord() string {
 			}
 
 			sb.Reset()
-			l.pos.NextColumn()
+			l.pos.nextColumn()
 			break
 		}
 
 		if char == ';' {
 			if sb.Len() > 0 {
 				err = l.reader.UnreadRune()
-				l.pos.PreviousColumn()
+				l.pos.previousColumn()
 				if err != nil {
 					panic(err)
 				}
@@ -82,7 +84,7 @@ func (l *Lexer) readWord() string {
 				panic(err)
 			}
 
-			l.pos.NextLine()
+			l.pos.nextLine()
 			break
 		}
 
@@ -90,7 +92,7 @@ func (l *Lexer) readWord() string {
 
 			if sb.Len() > 0 {
 				err = l.reader.UnreadRune()
-				l.pos.PreviousColumn()
+				l.pos.previousColumn()
 				if err != nil {
 					panic(err)
 				}
@@ -98,7 +100,7 @@ func (l *Lexer) readWord() string {
 				break
 			}
 
-			l.pos.NextLine()
+			l.pos.nextLine()
 			break
 		}
 
@@ -106,7 +108,7 @@ func (l *Lexer) readWord() string {
 			// if cursor is end of line
 			if sb.Len() > 0 {
 				err = l.reader.UnreadRune()
-				l.pos.PreviousColumn()
+				l.pos.previousColumn()
 				if err != nil {
 					panic(err)
 				}
@@ -121,7 +123,7 @@ func (l *Lexer) readWord() string {
 
 		if !isLetter && !isDigit && !isSpecial {
 			err = l.reader.UnreadRune()
-			l.pos.PreviousColumn()
+			l.pos.previousColumn()
 			if err != nil {
 				panic(err)
 			}
@@ -142,7 +144,7 @@ func (l *Lexer) readWord() string {
 	return sb.String()
 }
 
-func (l *Lexer) NextToken() token.Token {
+func (l *Lexer) nextToken() token.Token {
 	word := l.readWord()
 
 	switch word {
@@ -179,7 +181,7 @@ func (l *Lexer) Lex() []token.Token {
 	var tokens []token.Token
 
 	for {
-		tkn := l.NextToken()
+		tkn := l.nextToken()
 
 		if tkn == nil {
 			continue
