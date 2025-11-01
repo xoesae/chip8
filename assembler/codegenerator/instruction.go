@@ -290,3 +290,29 @@ func (c *CodeGenerator) processORInstruction(expression parser.Expression) {
 	lsb := (y << 4) | 0x1
 	c.appendOpcode(msb, lsb)
 }
+
+func (c *CodeGenerator) processANDInstruction(expression parser.Expression) {
+	// AND Vx, Vy | 8XY2
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid ADD instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid ADD instruction")
+	}
+
+	vy, ok := expression[2].(token.Register)
+	if !ok {
+		panic("invalid ADD instruction")
+	}
+	if vy.Value[0] != 'V' {
+		panic("invalid ADD instruction")
+	}
+
+	x := vx.Value[1]
+	y := vy.Value[1]
+	msb := 0x80 | x
+	lsb := (y << 4) | 0x2
+	c.appendOpcode(msb, lsb)
+}
