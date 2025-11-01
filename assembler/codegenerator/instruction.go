@@ -1,16 +1,16 @@
 package codegenerator
 
 import (
-	"github.com/xoesae/chip8/assembler/lexer/token"
 	"github.com/xoesae/chip8/assembler/parser"
+	token2 "github.com/xoesae/chip8/assembler/token"
 )
 
 func (c *CodeGenerator) processNNNInstruction(first byte, expression parser.Expression) {
-	if lit, ok := expression[1].(token.NumericLiteral); ok {
+	if lit, ok := expression[1].(token2.NumericLiteral); ok {
 		msb := first | byte((lit.Value&0xF00)>>8)
 		lsb := byte(lit.Value & 0x0FF)
 		c.appendOpcode(msb, lsb)
-	} else if lbl, ok := expression[1].(token.LabelOperand); ok {
+	} else if lbl, ok := expression[1].(token2.LabelOperand); ok {
 		addr, exists := c.labels[lbl.Value]
 		if exists {
 			msb := first | byte((addr&0xF00)>>8)
@@ -25,11 +25,11 @@ func (c *CodeGenerator) processNNNInstruction(first byte, expression parser.Expr
 func (c *CodeGenerator) processJPInstruction(expression parser.Expression) {
 	if len(expression) == 2 {
 		// JP addr | 1NNN
-		if lit, ok := expression[1].(token.NumericLiteral); ok {
+		if lit, ok := expression[1].(token2.NumericLiteral); ok {
 			msb := 0x10 | byte((lit.Value&0xF00)>>8)
 			lsb := byte(lit.Value & 0x0FF)
 			c.appendOpcode(msb, lsb)
-		} else if lbl, ok := expression[1].(token.LabelOperand); ok {
+		} else if lbl, ok := expression[1].(token2.LabelOperand); ok {
 			addr, exists := c.labels[lbl.Value]
 			if exists {
 				msb := 0x10 | byte((addr&0xF00)>>8)
@@ -43,11 +43,11 @@ func (c *CodeGenerator) processJPInstruction(expression parser.Expression) {
 
 	if len(expression) == 3 {
 		// JP V0, addr | BNNN
-		if lit, ok := expression[2].(token.NumericLiteral); ok {
+		if lit, ok := expression[2].(token2.NumericLiteral); ok {
 			msb := 0xB0 | byte((lit.Value&0xF00)>>8)
 			lsb := byte(lit.Value & 0x0FF)
 			c.appendOpcode(msb, lsb)
-		} else if lbl, ok := expression[2].(token.LabelOperand); ok {
+		} else if lbl, ok := expression[2].(token2.LabelOperand); ok {
 			addr, exists := c.labels[lbl.Value]
 			if exists {
 				msb := 0xB0 | byte((addr&0xF00)>>8)
@@ -67,19 +67,19 @@ func (c *CodeGenerator) processSEInstruction(first byte, expression parser.Expre
 	// expression[1] = Vx
 	// expression[2] = byte or Vy
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("Register expected")
 	}
 
 	switch operand := expression[2].(type) {
-	case token.NumericLiteral:
+	case token2.NumericLiteral:
 		// SE Vx, NN (3XNN)
 		// SNE Vx, NN (4XNN)
 		msb := first | (vx.Value[1] - '0') // V2 -> 0x32
 		lsb := byte(operand.Value & 0xFF)
 		c.appendOpcode(msb, lsb)
-	case token.Register:
+	case token2.Register:
 		// SE Vx, Vy (5XY0)
 		// SNE Vx, Vy (9XY0)
 		registerOpcode := byte(0x50)
@@ -97,7 +97,7 @@ func (c *CodeGenerator) processSEInstruction(first byte, expression parser.Expre
 }
 
 func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
-	destination := expression[1].(token.Register)
+	destination := expression[1].(token2.Register)
 	origin := expression[2]
 
 	// Dest is Vx
@@ -105,14 +105,14 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		x := destination.Value[1]
 
 		switch origin.(type) {
-		case token.NumericLiteral:
+		case token2.NumericLiteral:
 			// LD Vx, byte (6XNN)
 			msb := 0x60 | x
-			lsb := byte(origin.(token.NumericLiteral).Value & 0xFF)
+			lsb := byte(origin.(token2.NumericLiteral).Value & 0xFF)
 			c.appendOpcode(msb, lsb)
 			return
-		case token.Register:
-			reg := origin.(token.Register).Value
+		case token2.Register:
+			reg := origin.(token2.Register).Value
 
 			if reg[0] == 'V' {
 				// LD Vx, Vy (8XY0)
@@ -123,7 +123,7 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 				return
 			}
 
-			if reg == string(token.DT) {
+			if reg == string(token2.DT) {
 				// LD Vx, DT (FX07)
 				msb := 0xF0 | x
 				lsb := 0x07
@@ -131,7 +131,7 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 				return
 			}
 
-			if reg == string(token.K) {
+			if reg == string(token2.K) {
 				// LD Vx, K (FX0A)
 				msb := 0xF0 | x
 				lsb := 0x0A
@@ -139,7 +139,7 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 				return
 			}
 
-			if reg == string(token.VI) {
+			if reg == string(token2.VI) {
 				// LD Vx, [I] (FX65)
 				msb := 0xF0 | x
 				lsb := 0x65
@@ -149,9 +149,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		}
 	}
 
-	if destination.Value == string(token.I) {
+	if destination.Value == string(token2.I) {
 		// LD I, addr (ANNN)
-		addr, ok := origin.(token.NumericLiteral)
+		addr, ok := origin.(token2.NumericLiteral)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -162,9 +162,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		return
 	}
 
-	if destination.Value == string(token.DT) {
+	if destination.Value == string(token2.DT) {
 		// LD DT, Vx (FX15)
-		vx, ok := origin.(token.Register)
+		vx, ok := origin.(token2.Register)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -176,9 +176,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		return
 	}
 
-	if destination.Value == string(token.ST) {
+	if destination.Value == string(token2.ST) {
 		// LD ST, Vx (FX18)
-		vx, ok := origin.(token.Register)
+		vx, ok := origin.(token2.Register)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -190,9 +190,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		return
 	}
 
-	if destination.Value == string(token.F) {
+	if destination.Value == string(token2.F) {
 		// LD F, Vx (FX29)
-		vx, ok := origin.(token.Register)
+		vx, ok := origin.(token2.Register)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -205,9 +205,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 
 	}
 
-	if destination.Value == string(token.B) {
+	if destination.Value == string(token2.B) {
 		// LD B, Vx (FX33)
-		vx, ok := origin.(token.Register)
+		vx, ok := origin.(token2.Register)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -220,9 +220,9 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 
 	}
 
-	if destination.Value == string(token.VI) {
+	if destination.Value == string(token2.VI) {
 		// LD [I], Vx (FX55)
-		vx, ok := origin.(token.Register)
+		vx, ok := origin.(token2.Register)
 		if !ok {
 			panic("invalid LD instruction")
 		}
@@ -238,19 +238,19 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 }
 
 func (c *CodeGenerator) processADDInstruction(expression parser.Expression) {
-	destination := expression[1].(token.Register)
+	destination := expression[1].(token2.Register)
 
 	if destination.Value[0] == 'V' {
 		x := destination.Value[1] // V[x]
 
-		if num, ok := expression[2].(token.NumericLiteral); ok {
+		if num, ok := expression[2].(token2.NumericLiteral); ok {
 			// ADD Vx, byte	| Vx += byte | 7XNN
 			msb := 0x70 | x
 			lsb := byte(num.Value)
 			c.appendOpcode(msb, lsb)
 		}
 
-		if register, ok := expression[2].(token.Register); ok {
+		if register, ok := expression[2].(token2.Register); ok {
 			// ADD Vx, Vy | Vx += Vy | 8XY4
 			if register.Value[0] != 'V' {
 				panic("invalid ADD instruction")
@@ -264,9 +264,9 @@ func (c *CodeGenerator) processADDInstruction(expression parser.Expression) {
 		}
 	}
 
-	if destination.Value == string(token.I) {
+	if destination.Value == string(token2.I) {
 		// ADD I, Vx | I += Vx | FX1E
-		vx, ok := expression[2].(token.Register)
+		vx, ok := expression[2].(token2.Register)
 		if !ok {
 			panic("invalid ADD instruction")
 		}
@@ -287,7 +287,7 @@ func (c *CodeGenerator) processADDInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSUBInstruction(expression parser.Expression) {
 	// SUB Vx, Vy | Vx -= Vy | 8XY5
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SUB instruction")
 	}
@@ -295,7 +295,7 @@ func (c *CodeGenerator) processSUBInstruction(expression parser.Expression) {
 		panic("invalid SUB instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid SUB instruction")
 	}
@@ -313,7 +313,7 @@ func (c *CodeGenerator) processSUBInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSUBNInstruction(expression parser.Expression) {
 	// SUBN Vx, Vy | Vx = Vy - Vx | 8XY7
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SUBN instruction")
 	}
@@ -321,7 +321,7 @@ func (c *CodeGenerator) processSUBNInstruction(expression parser.Expression) {
 		panic("invalid SUBN instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid SUBN instruction")
 	}
@@ -339,7 +339,7 @@ func (c *CodeGenerator) processSUBNInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processORInstruction(expression parser.Expression) {
 	// OR Vx, Vy | 8XY1
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid OR instruction")
 	}
@@ -347,7 +347,7 @@ func (c *CodeGenerator) processORInstruction(expression parser.Expression) {
 		panic("invalid OR instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid OR instruction")
 	}
@@ -365,7 +365,7 @@ func (c *CodeGenerator) processORInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processANDInstruction(expression parser.Expression) {
 	// AND Vx, Vy | 8XY2
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid AND instruction")
 	}
@@ -373,7 +373,7 @@ func (c *CodeGenerator) processANDInstruction(expression parser.Expression) {
 		panic("invalid AND instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid AND instruction")
 	}
@@ -391,7 +391,7 @@ func (c *CodeGenerator) processANDInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processXORInstruction(expression parser.Expression) {
 	// XOR Vx, Vy | 8XY3
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid XOR instruction")
 	}
@@ -399,7 +399,7 @@ func (c *CodeGenerator) processXORInstruction(expression parser.Expression) {
 		panic("invalid XOR instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid XOR instruction")
 	}
@@ -417,7 +417,7 @@ func (c *CodeGenerator) processXORInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSHRInstruction(expression parser.Expression) {
 	// SHR Vx, Vy | 8XY6
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SHR instruction")
 	}
@@ -425,7 +425,7 @@ func (c *CodeGenerator) processSHRInstruction(expression parser.Expression) {
 		panic("invalid SHR instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid SHR instruction")
 	}
@@ -443,7 +443,7 @@ func (c *CodeGenerator) processSHRInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSHLInstruction(expression parser.Expression) {
 	// SHL Vx, Vy | 8XYE
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SHR instruction")
 	}
@@ -451,7 +451,7 @@ func (c *CodeGenerator) processSHLInstruction(expression parser.Expression) {
 		panic("invalid SHR instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid SHR instruction")
 	}
@@ -469,7 +469,7 @@ func (c *CodeGenerator) processSHLInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processRNDInstruction(expression parser.Expression) {
 	// RND Vx, byte | CXNN
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 
 	if !ok {
 		panic("invalid RND instruction")
@@ -481,7 +481,7 @@ func (c *CodeGenerator) processRNDInstruction(expression parser.Expression) {
 
 	x := vx.Value[1]
 
-	num, ok := expression[2].(token.NumericLiteral)
+	num, ok := expression[2].(token2.NumericLiteral)
 
 	if !ok {
 		panic("invalid RND instruction")
@@ -495,7 +495,7 @@ func (c *CodeGenerator) processRNDInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
 	// DRW Vx, Vy, nibble | DXYN
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid DRW instruction")
 	}
@@ -503,7 +503,7 @@ func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
 		panic("invalid DRW instruction")
 	}
 
-	vy, ok := expression[2].(token.Register)
+	vy, ok := expression[2].(token2.Register)
 	if !ok {
 		panic("invalid DRW instruction")
 	}
@@ -511,7 +511,7 @@ func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
 		panic("invalid DRW instruction")
 	}
 
-	num, ok := expression[3].(token.NumericLiteral)
+	num, ok := expression[3].(token2.NumericLiteral)
 	if !ok {
 		panic("invalid DRW instruction")
 	}
@@ -528,7 +528,7 @@ func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSKPInstruction(expression parser.Expression) {
 	// SKP Vx | EX9E
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SKP instruction")
 	}
@@ -546,7 +546,7 @@ func (c *CodeGenerator) processSKPInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSKPNInstruction(expression parser.Expression) {
 	// SKNP Vx | EXA1
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SKP instruction")
 	}
@@ -564,7 +564,7 @@ func (c *CodeGenerator) processSKPNInstruction(expression parser.Expression) {
 func (c *CodeGenerator) processSKNPInstruction(expression parser.Expression) {
 	// SKNP Vx | EXA1
 
-	vx, ok := expression[1].(token.Register)
+	vx, ok := expression[1].(token2.Register)
 	if !ok {
 		panic("invalid SKP instruction")
 	}

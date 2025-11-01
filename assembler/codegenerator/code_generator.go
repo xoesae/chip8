@@ -1,8 +1,8 @@
 package codegenerator
 
 import (
-	"github.com/xoesae/chip8/assembler/lexer/token"
 	"github.com/xoesae/chip8/assembler/parser"
+	token2 "github.com/xoesae/chip8/assembler/token"
 )
 
 type LabelMap map[string]uint32
@@ -38,7 +38,7 @@ func (c *CodeGenerator) appendOpcode(msb byte, lsb byte) {
 }
 
 func (c *CodeGenerator) processLabel(expression parser.Expression) {
-	label := expression[0].(token.Label)
+	label := expression[0].(token2.Label)
 	if _, exists := c.labels[label.Value]; exists {
 		panic("repeated label: " + label.Value) // TODO: improve errors
 	}
@@ -46,15 +46,15 @@ func (c *CodeGenerator) processLabel(expression parser.Expression) {
 }
 
 func (c *CodeGenerator) processDirective(expression parser.Expression) {
-	directive := expression[0].(token.Directive)
+	directive := expression[0].(token2.Directive)
 
 	switch directive.Value {
-	case string(token.Org):
-		addr := expression[1].(token.NumericLiteral)
+	case string(token2.Org):
+		addr := expression[1].(token2.NumericLiteral)
 		c.addressCounter.SetPos(addr.Value)
-	case string(token.Db):
+	case string(token2.Db):
 		for i := 1; i < len(expression); i++ {
-			literal := expression[i].(token.NumericLiteral)
+			literal := expression[i].(token2.NumericLiteral)
 			// set the byte on the current addres
 			c.opcodes[c.addressCounter.Pos()] = byte(literal.Value)
 			c.addressCounter.Advance()
@@ -63,60 +63,60 @@ func (c *CodeGenerator) processDirective(expression parser.Expression) {
 }
 
 func (c *CodeGenerator) processInstruction(expression parser.Expression) {
-	instr := expression[0].(token.Instruction)
+	instr := expression[0].(token2.Instruction)
 	switch instr.Value {
-	case string(token.CLS):
+	case string(token2.CLS):
 		c.appendOpcode(0x00, 0xE0)
-	case string(token.RET):
+	case string(token2.RET):
 		c.appendOpcode(0x00, 0xEE)
-	case string(token.JP):
+	case string(token2.JP):
 		c.processJPInstruction(expression)
-	case string(token.CALL):
+	case string(token2.CALL):
 		c.processNNNInstruction(0x20, expression)
-	case string(token.SE):
+	case string(token2.SE):
 		c.processSEInstruction(0x30, expression)
-	case string(token.SNE):
+	case string(token2.SNE):
 		c.processSEInstruction(0x40, expression)
-	case string(token.LD):
+	case string(token2.LD):
 		c.processLDInstruction(expression)
-	case string(token.ADD):
+	case string(token2.ADD):
 		c.processADDInstruction(expression)
-	case string(token.SUB):
+	case string(token2.SUB):
 		c.processSUBInstruction(expression)
-	case string(token.SUBN):
+	case string(token2.SUBN):
 		c.processSUBNInstruction(expression)
-	case string(token.OR):
+	case string(token2.OR):
 		c.processORInstruction(expression)
-	case string(token.AND):
+	case string(token2.AND):
 		c.processANDInstruction(expression)
-	case string(token.XOR):
+	case string(token2.XOR):
 		c.processXORInstruction(expression)
-	case string(token.SHR):
+	case string(token2.SHR):
 		c.processSHRInstruction(expression)
-	case string(token.SHL):
+	case string(token2.SHL):
 		c.processSHLInstruction(expression)
-	case string(token.RND):
+	case string(token2.RND):
 		c.processRNDInstruction(expression)
-	case string(token.DRW):
+	case string(token2.DRW):
 		c.processDRWInstruction(expression)
-	case string(token.SKP):
+	case string(token2.SKP):
 		c.processSKPInstruction(expression)
-	case string(token.SKNP):
+	case string(token2.SKNP):
 		c.processSKNPInstruction(expression)
 	}
 }
 
 func (c *CodeGenerator) Generate(expressions []parser.Expression) []byte {
 	for _, expression := range expressions {
-		if _, ok := expression[0].(token.Label); ok {
+		if _, ok := expression[0].(token2.Label); ok {
 			c.processLabel(expression)
 		}
 
-		if _, ok := expression[0].(token.Directive); ok {
+		if _, ok := expression[0].(token2.Directive); ok {
 			c.processDirective(expression)
 		}
 
-		if _, ok := expression[0].(token.Instruction); ok {
+		if _, ok := expression[0].(token2.Instruction); ok {
 			c.processInstruction(expression)
 		}
 

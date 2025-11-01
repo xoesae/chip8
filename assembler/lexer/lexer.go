@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/xoesae/chip8/assembler/lexer/token"
+	"github.com/xoesae/chip8/assembler/token"
 )
 
 type Lexer struct {
@@ -175,8 +175,6 @@ func (l *Lexer) NextToken() token.Token {
 	return nil
 }
 
-// Lex scans the input for the next token. It returns the position of the token,
-// the token's type, and the literal value.
 func (l *Lexer) Lex() []token.Token {
 	var tokens []token.Token
 

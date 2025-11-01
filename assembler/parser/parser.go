@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/xoesae/chip8/assembler/lexer/token"
+	"github.com/xoesae/chip8/assembler/token"
 )
 
 type Expression []token.Token
