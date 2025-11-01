@@ -218,18 +218,18 @@ func (c *CodeGenerator) processSUBInstruction(expression parser.Expression) {
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid SUB instruction")
 	}
 	if vx.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid SUB instruction")
 	}
 
 	vy, ok := expression[2].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid SUB instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid SUB instruction")
 	}
 
 	x := vx.Value[1]
@@ -244,18 +244,18 @@ func (c *CodeGenerator) processSUBNInstruction(expression parser.Expression) {
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid SUBN instruction")
 	}
 	if vx.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid SUBN instruction")
 	}
 
 	vy, ok := expression[2].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid SUBN instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid SUBN instruction")
 	}
 
 	x := vx.Value[1]
@@ -270,18 +270,18 @@ func (c *CodeGenerator) processORInstruction(expression parser.Expression) {
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid OR instruction")
 	}
 	if vx.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid OR instruction")
 	}
 
 	vy, ok := expression[2].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid OR instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid OR instruction")
 	}
 
 	x := vx.Value[1]
@@ -296,18 +296,18 @@ func (c *CodeGenerator) processANDInstruction(expression parser.Expression) {
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid AND instruction")
 	}
 	if vx.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid AND instruction")
 	}
 
 	vy, ok := expression[2].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid AND instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid AND instruction")
 	}
 
 	x := vx.Value[1]
@@ -322,23 +322,49 @@ func (c *CodeGenerator) processXORInstruction(expression parser.Expression) {
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid XOR instruction")
 	}
 	if vx.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid XOR instruction")
 	}
 
 	vy, ok := expression[2].(token.Register)
 	if !ok {
-		panic("invalid ADD instruction")
+		panic("invalid XOR instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid ADD instruction")
+		panic("invalid XOR instruction")
 	}
 
 	x := vx.Value[1]
 	y := vy.Value[1]
 	msb := 0x80 | x
 	lsb := (y << 4) | 0x3
+	c.appendOpcode(msb, lsb)
+}
+
+func (c *CodeGenerator) processSHRInstruction(expression parser.Expression) {
+	// SHR Vx, Vy | 8XY6
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid SHR instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid SHR instruction")
+	}
+
+	vy, ok := expression[2].(token.Register)
+	if !ok {
+		panic("invalid SHR instruction")
+	}
+	if vy.Value[0] != 'V' {
+		panic("invalid SHR instruction")
+	}
+
+	x := vx.Value[1]
+	y := vy.Value[1]
+	msb := 0x80 | x
+	lsb := (y << 4) | 0x6
 	c.appendOpcode(msb, lsb)
 }
