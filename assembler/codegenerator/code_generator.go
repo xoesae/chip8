@@ -70,7 +70,7 @@ func (c *CodeGenerator) processInstruction(expression parser.Expression) {
 	case string(token.RET):
 		c.appendOpcode(0x00, 0xEE)
 	case string(token.JP):
-		c.processNNNInstruction(0x10, expression)
+		c.processJPInstruction(expression)
 	case string(token.CALL):
 		c.processNNNInstruction(0x20, expression)
 	case string(token.SE):

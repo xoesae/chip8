@@ -22,10 +22,50 @@ func (c *CodeGenerator) processNNNInstruction(first byte, expression parser.Expr
 	}
 }
 
+func (c *CodeGenerator) processJPInstruction(expression parser.Expression) {
+	if len(expression) == 2 {
+		// JP addr | 1NNN
+		if lit, ok := expression[1].(token.NumericLiteral); ok {
+			msb := 0x10 | byte((lit.Value&0xF00)>>8)
+			lsb := byte(lit.Value & 0x0FF)
+			c.appendOpcode(msb, lsb)
+		} else if lbl, ok := expression[1].(token.LabelOperand); ok {
+			addr, exists := c.labels[lbl.Value]
+			if exists {
+				msb := 0x10 | byte((addr&0xF00)>>8)
+				lsb := byte(addr & 0xFF)
+				c.appendOpcode(msb, lsb)
+			} else {
+				panic("invalid label operand: " + lbl.Value)
+			}
+		}
+	}
+
+	if len(expression) == 3 {
+		// JP V0, addr | BNNN
+		if lit, ok := expression[2].(token.NumericLiteral); ok {
+			msb := 0xB0 | byte((lit.Value&0xF00)>>8)
+			lsb := byte(lit.Value & 0x0FF)
+			c.appendOpcode(msb, lsb)
+		} else if lbl, ok := expression[2].(token.LabelOperand); ok {
+			addr, exists := c.labels[lbl.Value]
+			if exists {
+				msb := 0xB0 | byte((addr&0xF00)>>8)
+				lsb := byte(addr & 0xFF)
+				c.appendOpcode(msb, lsb)
+			} else {
+				panic("invalid label operand: " + lbl.Value)
+			}
+		}
+	}
+
+	panic("Invalid JP instruction")
+
+}
+
 func (c *CodeGenerator) processSEInstruction(first byte, expression parser.Expression) {
 	// expression[1] = Vx
 	// expression[2] = byte or Vy
-	registerOpcode := byte(0x50)
 
 	vx, ok := expression[1].(token.Register)
 	if !ok {
@@ -35,11 +75,19 @@ func (c *CodeGenerator) processSEInstruction(first byte, expression parser.Expre
 	switch operand := expression[2].(type) {
 	case token.NumericLiteral:
 		// SE Vx, NN (3XNN)
+		// SNE Vx, NN (4XNN)
 		msb := first | (vx.Value[1] - '0') // V2 -> 0x32
 		lsb := byte(operand.Value & 0xFF)
 		c.appendOpcode(msb, lsb)
 	case token.Register:
 		// SE Vx, Vy (5XY0)
+		// SNE Vx, Vy (9XY0)
+		registerOpcode := byte(0x50)
+
+		if first == 0x40 {
+			registerOpcode = byte(0x90)
+		}
+
 		msb := registerOpcode | (vx.Value[1] - '0')
 		lsb := (operand.Value[1] - '0') << 4
 		c.appendOpcode(msb, lsb)
@@ -79,6 +127,14 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 				// LD Vx, DT (FX07)
 				msb := 0xF0 | x
 				lsb := 0x07
+				c.appendOpcode(msb, byte(lsb))
+				return
+			}
+
+			if reg == string(token.K) {
+				// LD Vx, K (FX0A)
+				msb := 0xF0 | x
+				lsb := 0x0A
 				c.appendOpcode(msb, byte(lsb))
 				return
 			}
@@ -144,6 +200,21 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 		x := vx.Value[1]
 		msb := 0xF0 | x
 		lsb := 0x29
+		c.appendOpcode(msb, byte(lsb))
+		return
+
+	}
+
+	if destination.Value == string(token.B) {
+		// LD B, Vx (FX33)
+		vx, ok := origin.(token.Register)
+		if !ok {
+			panic("invalid LD instruction")
+		}
+
+		x := vx.Value[1]
+		msb := 0xF0 | x
+		lsb := 0x33
 		c.appendOpcode(msb, byte(lsb))
 		return
 

@@ -5,7 +5,7 @@
 - [x] 1NNN
 - [x] 2NNN
 - [x] 3XNN
-- [ ] 4XNN
+- [x] 4XNN
 - [x] 5XY0
 - [x] 6XNN
 - [x] 7XNN
@@ -18,20 +18,20 @@
 - [x] 8XY6
 - [x] 8XY7
 - [x] 8XYE
-- [ ] 9XY0
+- [X] 9XY0
 - [x] ANNN
-- [ ] BNNN
+- [x] BNNN
 - [x] CXNN
 - [x] DXYN
 - [x] EX9E
 - [x] EXA1
 - [x] FX07
-- [ ] FX0A
+- [x] FX0A
 - [x] FX15
 - [x] FX18
 - [x] FX1E
 - [x] FX29
-- [ ] FX33
+- [x] FX33
 - [x] FX55
 - [x] FX65
 

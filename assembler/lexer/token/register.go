@@ -26,6 +26,8 @@ const (
 	ST RegisterType = "ST"
 	F  RegisterType = "F"
 	VI RegisterType = "[I]"
+	K  RegisterType = "K"
+	B  RegisterType = "B"
 )
 
 type Register struct {
@@ -83,6 +85,10 @@ func IsRegister(t string) bool {
 	case string(F):
 		return true
 	case string(VI):
+		return true
+	case string(K):
+		return true
+	case string(B):
 		return true
 	default:
 		return false
