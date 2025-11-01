@@ -21,7 +21,7 @@
 - [ ] 9XY0
 - [x] ANNN
 - [ ] BNNN
-- [ ] CXNN
+- [x] CXNN
 - [ ] DXYN
 - [ ] EX9E
 - [ ] EXA1

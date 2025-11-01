@@ -394,3 +394,29 @@ func (c *CodeGenerator) processSHLInstruction(expression parser.Expression) {
 	lsb := (y << 4) | 0xE
 	c.appendOpcode(msb, lsb)
 }
+
+func (c *CodeGenerator) processRNDInstruction(expression parser.Expression) {
+	// RND Vx, byte | CXNN
+
+	vx, ok := expression[1].(token.Register)
+
+	if !ok {
+		panic("invalid RND instruction")
+	}
+
+	if vx.Value[0] != 'V' {
+		panic("invalid RND instruction")
+	}
+
+	x := vx.Value[1]
+
+	num, ok := expression[2].(token.NumericLiteral)
+
+	if !ok {
+		panic("invalid RND instruction")
+	}
+
+	msb := 0x80 | x
+	lsb := byte(num.Value)
+	c.appendOpcode(msb, lsb)
+}

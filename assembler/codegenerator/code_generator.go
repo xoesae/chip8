@@ -96,7 +96,7 @@ func (c *CodeGenerator) processInstruction(expression parser.Expression) {
 	case string(token.SHL):
 		c.processSHLInstruction(expression)
 	case string(token.RND):
-		panic("todo: implement this instruction")
+		c.processRNDInstruction(expression)
 	case string(token.DRW):
 		panic("todo: implement this instruction")
 	case string(token.SKP):
