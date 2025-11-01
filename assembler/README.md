@@ -8,12 +8,12 @@
 - [ ] 4XNN
 - [x] 5XY0
 - [x] 6XNN
-- [ ] 7XNN
+- [x] 7XNN
 - [x] 8XY0
 - [ ] 8XY1
 - [ ] 8XY2
 - [ ] 8XY3
-- [ ] 8XY4
+- [x] 8XY4
 - [ ] 8XY5
 - [ ] 8XY6
 - [ ] 8XY7
@@ -29,7 +29,7 @@
 - [ ] FX0A
 - [x] FX15
 - [x] FX18
-- [ ] FX1E
+- [x] FX1E
 - [x] FX29
 - [ ] FX33
 - [x] FX55

@@ -165,3 +165,50 @@ func (c *CodeGenerator) processLDInstruction(expression parser.Expression) {
 
 	panic("Invalid LD instruction")
 }
+
+func (c *CodeGenerator) processADDInstruction(expression parser.Expression) {
+	destination := expression[1].(token.Register)
+
+	if destination.Value[0] == 'V' {
+		x := destination.Value[1] // V[x]
+
+		if num, ok := expression[2].(token.NumericLiteral); ok {
+			// ADD Vx, byte	| Vx += byte | 7XNN
+			msb := 0x70 | x
+			lsb := byte(num.Value)
+			c.appendOpcode(msb, lsb)
+		}
+
+		if register, ok := expression[2].(token.Register); ok {
+			// ADD Vx, Vy | Vx += Vy | 8XY4
+			if register.Value[0] != 'V' {
+				panic("invalid ADD instruction")
+			}
+
+			y := register.Value[1]
+
+			msb := 0x80 | x
+			lsb := (y << 4) | 0x4
+			c.appendOpcode(msb, lsb)
+		}
+	}
+
+	if destination.Value == string(token.I) {
+		// ADD I, Vx | I += Vx | FX1E
+		vx, ok := expression[2].(token.Register)
+		if !ok {
+			panic("invalid ADD instruction")
+		}
+		if vx.Value[0] != 'V' {
+			panic("invalid ADD instruction")
+		}
+
+		x := vx.Value[1]
+
+		msb := 0xF0 | x
+		lsb := 0x1E
+		c.appendOpcode(msb, byte(lsb))
+	}
+
+	panic("invalid ADD instruction")
+}
