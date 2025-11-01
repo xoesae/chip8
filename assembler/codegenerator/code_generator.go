@@ -70,15 +70,15 @@ func (c *CodeGenerator) processInstruction(expression parser.Expression) {
 	case string(token.RET):
 		c.appendOpcode(0x00, 0xEE)
 	case string(token.JP):
-		c.processJumpInstruction(0x10, expression)
+		c.processNNNInstruction(0x10, expression)
 	case string(token.CALL):
-		c.processJumpInstruction(0x20, expression)
+		c.processNNNInstruction(0x20, expression)
 	case string(token.SE):
-		c.processSEInstruction(0x30, 0x50, expression)
+		c.processSEInstruction(0x30, expression)
 	case string(token.SNE):
-		panic("todo: implement this instruction")
+		c.processSEInstruction(0x40, expression)
 	case string(token.LD):
-		panic("todo: implement this instruction")
+		c.processLDInstruction(expression)
 	case string(token.ADD):
 		panic("todo: implement this instruction")
 	case string(token.SUB):
