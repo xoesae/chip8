@@ -23,8 +23,8 @@
 - [ ] BNNN
 - [x] CXNN
 - [x] DXYN
-- [ ] EX9E
-- [ ] EXA1
+- [x] EX9E
+- [x] EXA1
 - [x] FX07
 - [ ] FX0A
 - [x] FX15

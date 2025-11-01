@@ -100,11 +100,9 @@ func (c *CodeGenerator) processInstruction(expression parser.Expression) {
 	case string(token.DRW):
 		c.processDRWInstruction(expression)
 	case string(token.SKP):
-		panic("todo: implement this instruction")
+		c.processSKPInstruction(expression)
 	case string(token.SKNP):
-		panic("todo: implement this instruction")
-	case string(token.SYS):
-		panic("todo: implement this instruction")
+		c.processSKNPInstruction(expression)
 	}
 }
 

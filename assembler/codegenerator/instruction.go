@@ -453,3 +453,57 @@ func (c *CodeGenerator) processDRWInstruction(expression parser.Expression) {
 	lsb := (y << 4) | n
 	c.appendOpcode(msb, lsb)
 }
+
+func (c *CodeGenerator) processSKPInstruction(expression parser.Expression) {
+	// SKP Vx | EX9E
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid SKP instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid SKP instruction")
+	}
+
+	x := vx.Value[1]
+
+	msb := 0xE0 | x
+	lsb := byte(0x9E)
+	c.appendOpcode(msb, lsb)
+}
+
+func (c *CodeGenerator) processSKPNInstruction(expression parser.Expression) {
+	// SKNP Vx | EXA1
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid SKP instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid SKP instruction")
+	}
+
+	x := vx.Value[1]
+
+	msb := 0xE0 | x
+	lsb := byte(0xA1)
+	c.appendOpcode(msb, lsb)
+}
+
+func (c *CodeGenerator) processSKNPInstruction(expression parser.Expression) {
+	// SKNP Vx | EXA1
+
+	vx, ok := expression[1].(token.Register)
+	if !ok {
+		panic("invalid SKP instruction")
+	}
+	if vx.Value[0] != 'V' {
+		panic("invalid SKP instruction")
+	}
+
+	x := vx.Value[1]
+
+	msb := 0xE0 | x
+	lsb := byte(0xA1)
+	c.appendOpcode(msb, lsb)
+}
