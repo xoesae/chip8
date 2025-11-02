@@ -4,6 +4,18 @@ import (
 	"github.com/xoesae/chip8/assembler/token"
 )
 
+func nibbleFromRegister(val string) byte {
+	c := val[1]
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0'
+	case c >= 'A' && c <= 'F':
+		return 10 + (c - 'A')
+	default:
+		panic("invalid register")
+	}
+}
+
 type InstructionGenerator interface {
 	generate() *OpCode
 }
@@ -34,11 +46,11 @@ func (j JP) generate() *OpCode {
 	case 2:
 		// JP addr (1NNN)
 		addr = j.expression[1]
-		prefix = byte(0x10)
+		prefix = byte(0x01)
 	case 3:
 		// JP V0, addr (BNNN)
 		addr = j.expression[2]
-		prefix = byte(0xB0)
+		prefix = byte(0x0B)
 	default:
 		panic("invalid argument to jp instruction")
 	}
@@ -70,7 +82,7 @@ type CALL struct {
 func (c CALL) generate() *OpCode {
 	// CALL addr (2NNN)
 	addr := c.expression[1]
-	prefix := byte(0x20)
+	prefix := byte(0x02)
 	var nnn uint16
 
 	switch addr.(type) {
@@ -98,25 +110,21 @@ type SE struct {
 
 func (s SE) generate() *OpCode {
 	operand := s.expression[2]
-	vx, ok := s.expression[1].(token.Register)
-	if !ok {
-		panic("Register expected for SE instruction")
-	}
-	x := vx.Value[1]
+	vx := mustAs[token.Register](s.expression[1])
+	x := nibbleFromRegister(vx.Value)
 
 	switch operand.(type) {
 	case token.NumericLiteral:
 		// SE Vx, NN (3XNN)
 		literal, _ := operand.(token.NumericLiteral)
 
-		return NewOpCodePXNN(byte(0x30), x, byte(literal.Value))
-
+		return NewOpCodePXNN(0x03, x, byte(literal.Value))
 	case token.Register:
 		// SE Vx, Vy (5XY0)
-		vy, _ := operand.(token.Register)
-		y := vy.Value[1]
+		vy := mustAs[token.Register](operand)
+		y := nibbleFromRegister(vy.Value)
 
-		return NewOpCodePXYS(byte(0x50), x, y, 0x00)
+		return NewOpCodePXYS(0x05, x, y, 0x0)
 	default:
 		panic("Register or NumericLiteral expected")
 	}
@@ -132,21 +140,20 @@ func (s SNE) generate() *OpCode {
 	if !ok {
 		panic("Register expected for SE instruction")
 	}
-	x := vx.Value[1]
+	x := nibbleFromRegister(vx.Value)
 
 	switch operand.(type) {
 	case token.NumericLiteral:
 		// SNE Vx, NN (4XNN)
 		literal, _ := operand.(token.NumericLiteral)
 
-		return NewOpCodePXNN(byte(0x40), x, byte(literal.Value))
-
+		return NewOpCodePXNN(0x04, x, byte(literal.Value))
 	case token.Register:
 		// SNE Vx, Vy (9XY0)
 		vy, _ := operand.(token.Register)
-		y := vy.Value[1]
+		y := nibbleFromRegister(vy.Value)
 
-		return NewOpCodePXYS(byte(0x90), x, y, 0x00)
+		return NewOpCodePXYS(0x09, x, y, 0x00)
 	default:
 		panic("Register or NumericLiteral expected")
 	}
@@ -165,14 +172,14 @@ func (l LD) generate() *OpCode {
 		string(token.VI): 0x55,
 	}
 
-	destination := l.expression[1].(token.Register)
+	destination := mustAs[token.Register](l.expression[1])
 	origin := l.expression[2]
 
 	// LD I, addr (ANNN)
 	if destination.Value == string(token.I) {
 		literal := mustAs[token.NumericLiteral](origin)
 
-		return NewOpCodePNNN(0xA0, uint16(literal.Value))
+		return NewOpCodePNNN(0x0A, uint16(literal.Value))
 	}
 
 	// LD {DT, ST, F, B, [I]}, Vx (FXNN)
@@ -182,26 +189,26 @@ func (l LD) generate() *OpCode {
 		return NewOpCodePXNN(0xF0, vx.Value[1], suffix)
 	}
 
-	x := mustAs[token.Register](origin).Value[1]
+	x := nibbleFromRegister(destination.Value)
 	switch o := origin.(type) {
 	case token.NumericLiteral:
 		// LD Vx, byte (6XNN)
-		return NewOpCodePXNN(0x60, x, byte(o.Value))
+		return NewOpCodePXNN(0x06, x, byte(o.Value))
 	case token.Register:
 		y := o.Value
 		switch {
 		case y[0] == 'V':
 			// LD Vx, Vy (8XY0)
-			return NewOpCodePXYS(0x80, x, y[1], 0x00)
+			return NewOpCodePXYS(0x08, x, y[1]-'0', 0x00)
 		case y == string(token.DT):
 			// LD Vx, DT (FX07)
-			return NewOpCodePXNN(0xF0, x, 0x07)
+			return NewOpCodePXNN(0x0F, x, 0x07)
 		case y == string(token.K):
 			// LD Vx, K (FX0A)
-			return NewOpCodePXNN(0xF0, x, 0x0A)
+			return NewOpCodePXNN(0x0F, x, 0x0A)
 		case y == string(token.VI):
 			// LD Vx, [I] (FX65)
-			return NewOpCodePXNN(0xF0, x, 0x65)
+			return NewOpCodePXNN(0x0F, x, 0x65)
 		}
 	}
 
@@ -216,11 +223,11 @@ func (a ADD) generate() *OpCode {
 	destination := mustAs[token.Register](a.expression[1])
 
 	if destination.Value[0] == 'V' {
-		x := destination.Value[1]
+		x := nibbleFromRegister(destination.Value)
 
 		if num, ok := a.expression[2].(token.NumericLiteral); ok {
 			// ADD Vx, byte (7XNN)
-			return NewOpCodePXNN(0x70, x, byte(num.Value))
+			return NewOpCodePXNN(0x07, x, byte(num.Value))
 		}
 
 		if register, ok := a.expression[2].(token.Register); ok {
@@ -228,25 +235,22 @@ func (a ADD) generate() *OpCode {
 			if register.Value[0] != 'V' {
 				panic("invalid ADD instruction")
 			}
-			y := register.Value[1]
+			y := nibbleFromRegister(register.Value)
 
-			return NewOpCodePXYS(0x80, x, y, 0x04)
+			return NewOpCodePXYS(0x08, x, y, 0x04)
 		}
 	}
 
 	if destination.Value == string(token.I) {
 		// ADD I, Vx (FX1E)
-		vx, ok := a.expression[2].(token.Register)
-		if !ok {
-			panic("invalid ADD instruction")
-		}
+		vx := mustAs[token.Register](a.expression[2])
 		if vx.Value[0] != 'V' {
 			panic("invalid ADD instruction")
 		}
 
-		x := vx.Value[1]
+		x := nibbleFromRegister(vx.Value)
 
-		return NewOpCodePXNN(0xF0, x, 0x1E)
+		return NewOpCodePXNN(0x0F, x, 0x1E)
 	}
 
 	panic("invalid ADD instruction")
@@ -268,10 +272,10 @@ func (s SUB) generate() *OpCode {
 		panic("invalid SUB instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x05)
+	return NewOpCodePXYS(0x08, x, y, 0x05)
 }
 
 type SUBN struct {
@@ -290,10 +294,10 @@ func (s SUBN) generate() *OpCode {
 		panic("invalid SUBN instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x07)
+	return NewOpCodePXYS(0x08, x, y, 0x07)
 }
 
 type OR struct {
@@ -312,10 +316,10 @@ func (o OR) generate() *OpCode {
 		panic("invalid OR instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x01)
+	return NewOpCodePXYS(0x08, x, y, 0x01)
 }
 
 type AND struct {
@@ -334,10 +338,10 @@ func (a AND) generate() *OpCode {
 		panic("invalid AND instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x02)
+	return NewOpCodePXYS(0x08, x, y, 0x02)
 }
 
 type XOR struct {
@@ -356,10 +360,10 @@ func (a XOR) generate() *OpCode {
 		panic("invalid XOR instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x03)
+	return NewOpCodePXYS(0x08, x, y, 0x03)
 }
 
 type SHR struct {
@@ -378,10 +382,10 @@ func (s SHR) generate() *OpCode {
 		panic("invalid SHR instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x06)
+	return NewOpCodePXYS(0x08, x, y, 0x06)
 }
 
 type SHL struct {
@@ -400,10 +404,10 @@ func (s SHL) generate() *OpCode {
 		panic("invalid SHL instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
 
-	return NewOpCodePXYS(0x80, x, y, 0x0E)
+	return NewOpCodePXYS(0x08, x, y, 0x0E)
 }
 
 type RND struct {
@@ -418,9 +422,9 @@ func (r RND) generate() *OpCode {
 	if vx.Value[0] != 'V' {
 		panic("invalid RND instruction")
 	}
-	x := vx.Value[1]
+	x := nibbleFromRegister(vx.Value)
 
-	return NewOpCodePXSS(0xC0, x, byte(literal.Value))
+	return NewOpCodePXSS(0x0C, x, byte(literal.Value))
 }
 
 type DRW struct {
@@ -440,11 +444,12 @@ func (d DRW) generate() *OpCode {
 		panic("invalid DRW instruction")
 	}
 
-	x := vx.Value[1]
-	y := vy.Value[1]
+	x := nibbleFromRegister(vx.Value)
+	y := nibbleFromRegister(vy.Value)
+
 	n := uint8(literal.Value)
 
-	return NewOpCodePXYS(0xD0, x, y, n)
+	return NewOpCodePXYS(0x0D, x, y, n)
 }
 
 type SKP struct {
@@ -458,9 +463,9 @@ func (s SKP) generate() *OpCode {
 	if vx.Value[0] != 'V' {
 		panic("invalid SKP instruction")
 	}
-	x := vx.Value[1]
+	x := nibbleFromRegister(vx.Value)
 
-	return NewOpCodePXNN(0xE0, x, 0x9E)
+	return NewOpCodePXNN(0x0E, x, 0x9E)
 }
 
 type SKNP struct {
@@ -474,9 +479,9 @@ func (s SKNP) generate() *OpCode {
 	if vx.Value[0] != 'V' {
 		panic("invalid SKP instruction")
 	}
-	x := vx.Value[1]
+	x := nibbleFromRegister(vx.Value)
 
-	return NewOpCodePXNN(0xE0, x, 0xA1)
+	return NewOpCodePXNN(0x0E, x, 0xA1)
 }
 
 func (c *CodeGenerator) getInstructionGenerator(expression token.Expression) InstructionGenerator {

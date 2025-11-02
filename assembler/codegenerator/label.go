@@ -1,15 +1,19 @@
 package codegenerator
 
-import "github.com/xoesae/chip8/assembler/token"
+import (
+	"fmt"
 
-func (c *CodeGenerator) processLabel(expression token.Expression) {
-	label := expression[0].(token.Label)
+	"github.com/xoesae/chip8/assembler/token"
+)
+
+func (c *CodeGenerator) processLabel(expression token.Expression) error {
+	label := mustAs[token.Label](expression[0])
 	if _, exists := c.labels[label.Value]; exists {
-		panic("repeated label: " + label.Value) // TODO: improve errors
+		return fmt.Errorf("repeated label")
 	}
 
 	// Set current address for the label
 	c.labels[label.Value] = c.addressCounter.pos
 
-	// TODO: maybe advance address?
+	return nil
 }

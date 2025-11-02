@@ -25,7 +25,7 @@ func NewOpCodePXNN(prefix, x, nn byte) *OpCode {
 	return &OpCode{Bytes: [2]byte{msb, lsb}}
 }
 
-// 5XY0, 8XY0, 8XY1, ... 8XYE, 9XY0
+// 5XY0, 8XY0, 8XY1, ..., 8XYE, 9XY0
 func NewOpCodePXYS(prefix, x, y, suffix byte) *OpCode {
 	msb := prefix<<4 | x
 	lsb := (y << 4) | suffix

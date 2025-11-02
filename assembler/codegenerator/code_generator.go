@@ -11,7 +11,17 @@ type LabelMap map[string]uint32
 type CodeGenerator struct {
 	addressCounter AddressCounter
 	labels         LabelMap
-	opcodes        []byte
+	opcodes        map[uint32]byte
+}
+
+func NewCodeGenerator() *CodeGenerator {
+	return &CodeGenerator{
+		addressCounter: AddressCounter{
+			pos: 0,
+		},
+		labels:  make(LabelMap),
+		opcodes: make(map[uint32]byte),
+	}
 }
 
 func (c *CodeGenerator) appendOpcode(opcode *OpCode) {
@@ -32,20 +42,27 @@ func mustAs[T any](val any) T {
 	return result
 }
 
-func (c *CodeGenerator) Generate(expressions []token.Expression) []byte {
+func (c *CodeGenerator) Generate(expressions []token.Expression) map[uint32]byte {
 	for _, expression := range expressions {
 		if _, ok := expression[0].(token.Label); ok {
-			c.processLabel(expression)
+			err := c.processLabel(expression)
+			if err != nil {
+				panic(err)
+			}
+
+			continue
 		}
 
 		if _, ok := expression[0].(token.Directive); ok {
 			c.processDirective(expression)
+			continue
 		}
 
 		if _, ok := expression[0].(token.Instruction); ok {
 			g := c.getInstructionGenerator(expression)
 			opcode := g.generate()
 			c.appendOpcode(opcode)
+			continue
 		}
 
 		panic("invalid expression")
