@@ -39,7 +39,7 @@ func TestJPGenerateNumeric(t *testing.T) {
 }
 
 func TestJPGenerateLabel(t *testing.T) {
-	expr := token.Expression{instr("JP"), lbl("loop")}
+	expr := token.Expression{instr("JP"), lbl("#loop")}
 	expected := [2]byte{0x15, 0x67}
 	opcode := JP{expression: expr, labels: labels}.generate()
 	if opcode.Bytes != expected {
@@ -66,7 +66,7 @@ func TestCALLGenerateNumeric(t *testing.T) {
 }
 
 func TestCALLGenerateLabel(t *testing.T) {
-	expr := token.Expression{instr("CALL"), lbl("func")}
+	expr := token.Expression{instr("CALL"), lbl("#func")}
 	expected := [2]byte{0x24, 0x44}
 	opcode := CALL{expression: expr, labels: labels}.generate()
 	if opcode.Bytes != expected {

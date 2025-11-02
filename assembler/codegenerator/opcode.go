@@ -13,7 +13,7 @@ func NewOpCode(bytes [2]byte) *OpCode {
 
 // 1NNN, 2NNN, ANNN, BNNN
 func NewOpCodePNNN(prefix byte, nnn uint16) *OpCode {
-	msb := prefix<<4 | byte((nnn&0xF00)>>8)
+	msb := (prefix << 4) | byte((nnn&0xF00)>>8)
 	lsb := byte(nnn & 0xFF)
 	return &OpCode{Bytes: [2]byte{msb, lsb}}
 }

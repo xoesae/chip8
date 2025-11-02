@@ -182,7 +182,7 @@ func (l LD) generate() *OpCode {
 	if destination.Value == string(token.I) {
 		var nnn uint16
 
-		if literal, ok := origin.(token.NumericLiteral); !ok {
+		if literal, ok := origin.(token.NumericLiteral); ok {
 			nnn = uint16(literal.Value)
 		}
 
