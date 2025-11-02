@@ -58,9 +58,10 @@ func (j JP) generate() *OpCode {
 	switch addr.(type) {
 	case token.LabelOperand:
 		label, _ := addr.(token.LabelOperand)
-		labelAddress, exists := j.labels[label.Value]
+		parsedLabel := token.ParseLabelOperand(label.Value)
+		labelAddress, exists := j.labels[parsedLabel]
 		if !exists {
-			panic("define label before jump it. label: " + label.Value)
+			panic("define label before jump it. label: " + parsedLabel)
 		}
 
 		nnn = uint16(labelAddress)
@@ -88,9 +89,10 @@ func (c CALL) generate() *OpCode {
 	switch addr.(type) {
 	case token.LabelOperand:
 		label, _ := addr.(token.LabelOperand)
-		labelAddress, exists := c.labels[label.Value]
+		parsedLabel := token.ParseLabelOperand(label.Value)
+		labelAddress, exists := c.labels[parsedLabel]
 		if !exists {
-			panic("define label before call it. label: " + label.Value)
+			panic("define label before call it. label: " + parsedLabel)
 		}
 
 		nnn = uint16(labelAddress)
@@ -161,6 +163,7 @@ func (s SNE) generate() *OpCode {
 
 type LD struct {
 	expression token.Expression
+	labels     LabelMap
 }
 
 func (l LD) generate() *OpCode {
@@ -177,9 +180,23 @@ func (l LD) generate() *OpCode {
 
 	// LD I, addr (ANNN)
 	if destination.Value == string(token.I) {
-		literal := mustAs[token.NumericLiteral](origin)
+		var nnn uint16
 
-		return NewOpCodePNNN(0x0A, uint16(literal.Value))
+		if literal, ok := origin.(token.NumericLiteral); !ok {
+			nnn = uint16(literal.Value)
+		}
+
+		if label, ok := origin.(token.LabelOperand); ok {
+			parsedLabel := token.ParseLabelOperand(label.Value)
+			labelAddress, exists := l.labels[parsedLabel]
+			if !exists {
+				panic("define label before call it. label: " + parsedLabel)
+			}
+
+			nnn = uint16(labelAddress)
+		}
+
+		return NewOpCodePNNN(0x0A, nnn)
 	}
 
 	// LD {DT, ST, F, B, [I]}, Vx (FXNN)
@@ -513,6 +530,7 @@ func (c *CodeGenerator) getInstructionGenerator(expression token.Expression) Ins
 	case string(token.LD):
 		return LD{
 			expression: expression,
+			labels:     c.labels,
 		}
 	case string(token.ADD):
 		return ADD{
