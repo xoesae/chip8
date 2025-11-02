@@ -4,268 +4,239 @@ import (
 	"github.com/xoesae/chip8/assembler/token"
 )
 
-func (c *CodeGenerator) processNNNInstruction(first byte, expression token.Expression) {
-	if lit, ok := expression[1].(token.NumericLiteral); ok {
-		msb := first | byte((lit.Value&0xF00)>>8)
-		lsb := byte(lit.Value & 0x0FF)
-		c.appendOpcode(msb, lsb)
-	} else if lbl, ok := expression[1].(token.LabelOperand); ok {
-		addr, exists := c.labels[lbl.Value]
-		if exists {
-			msb := first | byte((addr&0xF00)>>8)
-			lsb := byte(addr & 0xFF)
-			c.appendOpcode(msb, lsb)
-		} else {
-			panic("invalid label operand: " + lbl.Value)
-		}
-	}
+type InstructionGenerator interface {
+	generate() *OpCode
 }
 
-func (c *CodeGenerator) processJPInstruction(expression token.Expression) {
-	if len(expression) == 2 {
-		// JP addr | 1NNN
-		if lit, ok := expression[1].(token.NumericLiteral); ok {
-			msb := 0x10 | byte((lit.Value&0xF00)>>8)
-			lsb := byte(lit.Value & 0x0FF)
-			c.appendOpcode(msb, lsb)
-		} else if lbl, ok := expression[1].(token.LabelOperand); ok {
-			addr, exists := c.labels[lbl.Value]
-			if exists {
-				msb := 0x10 | byte((addr&0xF00)>>8)
-				lsb := byte(addr & 0xFF)
-				c.appendOpcode(msb, lsb)
-			} else {
-				panic("invalid label operand: " + lbl.Value)
-			}
-		}
-	}
+type CLS struct{}
 
-	if len(expression) == 3 {
-		// JP V0, addr | BNNN
-		if lit, ok := expression[2].(token.NumericLiteral); ok {
-			msb := 0xB0 | byte((lit.Value&0xF00)>>8)
-			lsb := byte(lit.Value & 0x0FF)
-			c.appendOpcode(msb, lsb)
-		} else if lbl, ok := expression[2].(token.LabelOperand); ok {
-			addr, exists := c.labels[lbl.Value]
-			if exists {
-				msb := 0xB0 | byte((addr&0xF00)>>8)
-				lsb := byte(addr & 0xFF)
-				c.appendOpcode(msb, lsb)
-			} else {
-				panic("invalid label operand: " + lbl.Value)
-			}
-		}
-	}
-
-	panic("Invalid JP instruction")
-
+func (c CLS) generate() *OpCode {
+	return NewOpCode([2]byte{0x00, 0xE0})
 }
 
-func (c *CodeGenerator) processSEInstruction(first byte, expression token.Expression) {
-	// expression[1] = Vx
-	// expression[2] = byte or Vy
+type RET struct{}
 
-	vx, ok := expression[1].(token.Register)
+func (r RET) generate() *OpCode {
+	return NewOpCode([2]byte{0x00, 0xEE})
+}
+
+type JP struct {
+	expression token.Expression
+	labels     LabelMap
+}
+
+func (j JP) generate() *OpCode {
+	var addr token.Token
+	var prefix byte
+	var nnn uint16
+
+	switch len(j.expression) {
+	case 2:
+		// JP addr (1NNN)
+		addr = j.expression[1]
+		prefix = byte(0x10)
+	case 3:
+		// JP V0, addr (BNNN)
+		addr = j.expression[2]
+		prefix = byte(0xB0)
+	default:
+		panic("invalid argument to jp instruction")
+	}
+
+	switch addr.(type) {
+	case token.LabelOperand:
+		label, _ := addr.(token.LabelOperand)
+		labelAddress, exists := j.labels[label.Value]
+		if !exists {
+			panic("define label before jump it. label: " + label.Value)
+		}
+
+		nnn = uint16(labelAddress)
+	case token.NumericLiteral:
+		literal, _ := addr.(token.NumericLiteral)
+		nnn = uint16(literal.Value)
+	default:
+		panic("invalid argument to jp instruction")
+	}
+
+	return NewOpCodePNNN(prefix, nnn)
+}
+
+type CALL struct {
+	expression token.Expression
+	labels     LabelMap
+}
+
+func (c CALL) generate() *OpCode {
+	// CALL addr (2NNN)
+	addr := c.expression[1]
+	prefix := byte(0x20)
+	var nnn uint16
+
+	switch addr.(type) {
+	case token.LabelOperand:
+		label, _ := addr.(token.LabelOperand)
+		labelAddress, exists := c.labels[label.Value]
+		if !exists {
+			panic("define label before call it. label: " + label.Value)
+		}
+
+		nnn = uint16(labelAddress)
+	case token.NumericLiteral:
+		literal, _ := addr.(token.NumericLiteral)
+		nnn = uint16(literal.Value)
+	default:
+		panic("invalid argument to call instruction")
+	}
+
+	return NewOpCodePNNN(prefix, nnn)
+}
+
+type SE struct {
+	expression token.Expression
+}
+
+func (s SE) generate() *OpCode {
+	operand := s.expression[2]
+	vx, ok := s.expression[1].(token.Register)
 	if !ok {
-		panic("Register expected")
+		panic("Register expected for SE instruction")
 	}
+	x := vx.Value[1]
 
-	switch operand := expression[2].(type) {
+	switch operand.(type) {
 	case token.NumericLiteral:
 		// SE Vx, NN (3XNN)
-		// SNE Vx, NN (4XNN)
-		msb := first | (vx.Value[1] - '0') // V2 -> 0x32
-		lsb := byte(operand.Value & 0xFF)
-		c.appendOpcode(msb, lsb)
+		literal, _ := operand.(token.NumericLiteral)
+
+		return NewOpCodePXNN(byte(0x30), x, byte(literal.Value))
+
 	case token.Register:
 		// SE Vx, Vy (5XY0)
-		// SNE Vx, Vy (9XY0)
-		registerOpcode := byte(0x50)
+		vy, _ := operand.(token.Register)
+		y := vy.Value[1]
 
-		if first == 0x40 {
-			registerOpcode = byte(0x90)
-		}
-
-		msb := registerOpcode | (vx.Value[1] - '0')
-		lsb := (operand.Value[1] - '0') << 4
-		c.appendOpcode(msb, lsb)
+		return NewOpCodePXYS(byte(0x50), x, y, 0x00)
 	default:
 		panic("Register or NumericLiteral expected")
 	}
 }
 
-func (c *CodeGenerator) processLDInstruction(expression token.Expression) {
-	destination := expression[1].(token.Register)
-	origin := expression[2]
+type SNE struct {
+	expression token.Expression
+}
 
-	// Dest is Vx
-	if destination.Value[0] == 'V' {
-		x := destination.Value[1]
+func (s SNE) generate() *OpCode {
+	operand := s.expression[2]
+	vx, ok := s.expression[1].(token.Register)
+	if !ok {
+		panic("Register expected for SE instruction")
+	}
+	x := vx.Value[1]
 
-		switch origin.(type) {
-		case token.NumericLiteral:
-			// LD Vx, byte (6XNN)
-			msb := 0x60 | x
-			lsb := byte(origin.(token.NumericLiteral).Value & 0xFF)
-			c.appendOpcode(msb, lsb)
-			return
-		case token.Register:
-			reg := origin.(token.Register).Value
+	switch operand.(type) {
+	case token.NumericLiteral:
+		// SNE Vx, NN (4XNN)
+		literal, _ := operand.(token.NumericLiteral)
 
-			if reg[0] == 'V' {
-				// LD Vx, Vy (8XY0)
-				y := reg[1]
-				msb := 0x80 | x
-				lsb := y<<4 | 0x00
-				c.appendOpcode(msb, lsb)
-				return
-			}
+		return NewOpCodePXNN(byte(0x40), x, byte(literal.Value))
 
-			if reg == string(token.DT) {
-				// LD Vx, DT (FX07)
-				msb := 0xF0 | x
-				lsb := 0x07
-				c.appendOpcode(msb, byte(lsb))
-				return
-			}
+	case token.Register:
+		// SNE Vx, Vy (9XY0)
+		vy, _ := operand.(token.Register)
+		y := vy.Value[1]
 
-			if reg == string(token.K) {
-				// LD Vx, K (FX0A)
-				msb := 0xF0 | x
-				lsb := 0x0A
-				c.appendOpcode(msb, byte(lsb))
-				return
-			}
+		return NewOpCodePXYS(byte(0x90), x, y, 0x00)
+	default:
+		panic("Register or NumericLiteral expected")
+	}
+}
 
-			if reg == string(token.VI) {
-				// LD Vx, [I] (FX65)
-				msb := 0xF0 | x
-				lsb := 0x65
-				c.appendOpcode(msb, byte(lsb))
-				return
-			}
-		}
+type LD struct {
+	expression token.Expression
+}
+
+func (l LD) generate() *OpCode {
+	fxnnCases := map[string]byte{
+		string(token.DT): 0x15,
+		string(token.ST): 0x18,
+		string(token.F):  0x29,
+		string(token.B):  0x33,
+		string(token.VI): 0x55,
 	}
 
+	destination := l.expression[1].(token.Register)
+	origin := l.expression[2]
+
+	// LD I, addr (ANNN)
 	if destination.Value == string(token.I) {
-		// LD I, addr (ANNN)
-		addr, ok := origin.(token.NumericLiteral)
-		if !ok {
-			panic("invalid LD instruction")
-		}
+		literal := mustAs[token.NumericLiteral](origin)
 
-		msb := 0xA0 | byte((addr.Value>>8)&0x0F)
-		lsb := byte(addr.Value & 0xFF)
-		c.appendOpcode(msb, lsb)
-		return
+		return NewOpCodePNNN(0xA0, uint16(literal.Value))
 	}
 
-	if destination.Value == string(token.DT) {
-		// LD DT, Vx (FX15)
-		vx, ok := origin.(token.Register)
-		if !ok {
-			panic("invalid LD instruction")
-		}
+	// LD {DT, ST, F, B, [I]}, Vx (FXNN)
+	if suffix, found := fxnnCases[destination.Value]; found {
+		vx := mustAs[token.Register](origin)
 
-		x := vx.Value[1]
-		msb := 0xF0 | x
-		lsb := 0x15
-		c.appendOpcode(msb, byte(lsb))
-		return
+		return NewOpCodePXNN(0xF0, vx.Value[1], suffix)
 	}
 
-	if destination.Value == string(token.ST) {
-		// LD ST, Vx (FX18)
-		vx, ok := origin.(token.Register)
-		if !ok {
-			panic("invalid LD instruction")
+	x := mustAs[token.Register](origin).Value[1]
+	switch o := origin.(type) {
+	case token.NumericLiteral:
+		// LD Vx, byte (6XNN)
+		return NewOpCodePXNN(0x60, x, byte(o.Value))
+	case token.Register:
+		y := o.Value
+		switch {
+		case y[0] == 'V':
+			// LD Vx, Vy (8XY0)
+			return NewOpCodePXYS(0x80, x, y[1], 0x00)
+		case y == string(token.DT):
+			// LD Vx, DT (FX07)
+			return NewOpCodePXNN(0xF0, x, 0x07)
+		case y == string(token.K):
+			// LD Vx, K (FX0A)
+			return NewOpCodePXNN(0xF0, x, 0x0A)
+		case y == string(token.VI):
+			// LD Vx, [I] (FX65)
+			return NewOpCodePXNN(0xF0, x, 0x65)
 		}
-
-		x := vx.Value[1]
-		msb := 0xF0 | x
-		lsb := 0x18
-		c.appendOpcode(msb, byte(lsb))
-		return
-	}
-
-	if destination.Value == string(token.F) {
-		// LD F, Vx (FX29)
-		vx, ok := origin.(token.Register)
-		if !ok {
-			panic("invalid LD instruction")
-		}
-
-		x := vx.Value[1]
-		msb := 0xF0 | x
-		lsb := 0x29
-		c.appendOpcode(msb, byte(lsb))
-		return
-
-	}
-
-	if destination.Value == string(token.B) {
-		// LD B, Vx (FX33)
-		vx, ok := origin.(token.Register)
-		if !ok {
-			panic("invalid LD instruction")
-		}
-
-		x := vx.Value[1]
-		msb := 0xF0 | x
-		lsb := 0x33
-		c.appendOpcode(msb, byte(lsb))
-		return
-
-	}
-
-	if destination.Value == string(token.VI) {
-		// LD [I], Vx (FX55)
-		vx, ok := origin.(token.Register)
-		if !ok {
-			panic("invalid LD instruction")
-		}
-
-		x := vx.Value[1]
-		msb := 0xF0 | x
-		lsb := 0x55
-		c.appendOpcode(msb, byte(lsb))
-		return
 	}
 
 	panic("Invalid LD instruction")
 }
 
-func (c *CodeGenerator) processADDInstruction(expression token.Expression) {
-	destination := expression[1].(token.Register)
+type ADD struct {
+	expression token.Expression
+}
+
+func (a ADD) generate() *OpCode {
+	destination := mustAs[token.Register](a.expression[1])
 
 	if destination.Value[0] == 'V' {
-		x := destination.Value[1] // V[x]
+		x := destination.Value[1]
 
-		if num, ok := expression[2].(token.NumericLiteral); ok {
-			// ADD Vx, byte	| Vx += byte | 7XNN
-			msb := 0x70 | x
-			lsb := byte(num.Value)
-			c.appendOpcode(msb, lsb)
+		if num, ok := a.expression[2].(token.NumericLiteral); ok {
+			// ADD Vx, byte (7XNN)
+			return NewOpCodePXNN(0x70, x, byte(num.Value))
 		}
 
-		if register, ok := expression[2].(token.Register); ok {
-			// ADD Vx, Vy | Vx += Vy | 8XY4
+		if register, ok := a.expression[2].(token.Register); ok {
+			// ADD Vx, Vy (8XY4)
 			if register.Value[0] != 'V' {
 				panic("invalid ADD instruction")
 			}
-
 			y := register.Value[1]
 
-			msb := 0x80 | x
-			lsb := (y << 4) | 0x4
-			c.appendOpcode(msb, lsb)
+			return NewOpCodePXYS(0x80, x, y, 0x04)
 		}
 	}
 
 	if destination.Value == string(token.I) {
-		// ADD I, Vx | I += Vx | FX1E
-		vx, ok := expression[2].(token.Register)
+		// ADD I, Vx (FX1E)
+		vx, ok := a.expression[2].(token.Register)
 		if !ok {
 			panic("invalid ADD instruction")
 		}
@@ -275,27 +246,22 @@ func (c *CodeGenerator) processADDInstruction(expression token.Expression) {
 
 		x := vx.Value[1]
 
-		msb := 0xF0 | x
-		lsb := 0x1E
-		c.appendOpcode(msb, byte(lsb))
+		return NewOpCodePXNN(0xF0, x, 0x1E)
 	}
 
 	panic("invalid ADD instruction")
 }
 
-func (c *CodeGenerator) processSUBInstruction(expression token.Expression) {
-	// SUB Vx, Vy | Vx -= Vy | 8XY5
+type SUB struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SUB instruction")
-	}
+func (s SUB) generate() *OpCode {
+	// SUB Vx, Vy (8XY5)
+	vx := mustAs[token.Register](s.expression[1])
+	vy := mustAs[token.Register](s.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid SUB instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid SUB instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -304,24 +270,20 @@ func (c *CodeGenerator) processSUBInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x5
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x05)
 }
 
-func (c *CodeGenerator) processSUBNInstruction(expression token.Expression) {
-	// SUBN Vx, Vy | Vx = Vy - Vx | 8XY7
+type SUBN struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SUBN instruction")
-	}
+func (s SUBN) generate() *OpCode {
+	// SUBN Vx, Vy (8XY7)
+	vx := mustAs[token.Register](s.expression[1])
+	vy := mustAs[token.Register](s.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid SUBN instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid SUBN instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -330,24 +292,20 @@ func (c *CodeGenerator) processSUBNInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x7
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x07)
 }
 
-func (c *CodeGenerator) processORInstruction(expression token.Expression) {
-	// OR Vx, Vy | 8XY1
+type OR struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid OR instruction")
-	}
+func (o OR) generate() *OpCode {
+	// OR Vx, Vy (8XY1)
+	vx := mustAs[token.Register](o.expression[1])
+	vy := mustAs[token.Register](o.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid OR instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid OR instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -356,24 +314,20 @@ func (c *CodeGenerator) processORInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x1
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x01)
 }
 
-func (c *CodeGenerator) processANDInstruction(expression token.Expression) {
-	// AND Vx, Vy | 8XY2
+type AND struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid AND instruction")
-	}
+func (a AND) generate() *OpCode {
+	// AND Vx, Vy (8XY2)
+	vx := mustAs[token.Register](a.expression[1])
+	vy := mustAs[token.Register](a.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid AND instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid AND instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -382,24 +336,20 @@ func (c *CodeGenerator) processANDInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x2
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x02)
 }
 
-func (c *CodeGenerator) processXORInstruction(expression token.Expression) {
-	// XOR Vx, Vy | 8XY3
+type XOR struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid XOR instruction")
-	}
+func (a XOR) generate() *OpCode {
+	// XOR Vx, Vy (8XY3)
+	vx := mustAs[token.Register](a.expression[1])
+	vy := mustAs[token.Register](a.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid XOR instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid XOR instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -408,24 +358,20 @@ func (c *CodeGenerator) processXORInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x3
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x03)
 }
 
-func (c *CodeGenerator) processSHRInstruction(expression token.Expression) {
-	// SHR Vx, Vy | 8XY6
+type SHR struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SHR instruction")
-	}
+func (s SHR) generate() *OpCode {
+	// SHR Vx, Vy (8XY6)
+	vx := mustAs[token.Register](s.expression[1])
+	vy := mustAs[token.Register](s.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid SHR instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid SHR instruction")
 	}
 	if vy.Value[0] != 'V' {
@@ -434,146 +380,184 @@ func (c *CodeGenerator) processSHRInstruction(expression token.Expression) {
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0x6
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x06)
 }
 
-func (c *CodeGenerator) processSHLInstruction(expression token.Expression) {
-	// SHL Vx, Vy | 8XYE
+type SHL struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SHR instruction")
-	}
+func (s SHL) generate() *OpCode {
+	// SHL Vx, Vy (8XYE)
+	vx := mustAs[token.Register](s.expression[1])
+	vy := mustAs[token.Register](s.expression[2])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid SHR instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
-		panic("invalid SHR instruction")
+		panic("invalid SHL instruction")
 	}
 	if vy.Value[0] != 'V' {
-		panic("invalid SHR instruction")
+		panic("invalid SHL instruction")
 	}
 
 	x := vx.Value[1]
 	y := vy.Value[1]
-	msb := 0x80 | x
-	lsb := (y << 4) | 0xE
-	c.appendOpcode(msb, lsb)
+
+	return NewOpCodePXYS(0x80, x, y, 0x0E)
 }
 
-func (c *CodeGenerator) processRNDInstruction(expression token.Expression) {
-	// RND Vx, byte | CXNN
+type RND struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-
-	if !ok {
-		panic("invalid RND instruction")
-	}
+func (r RND) generate() *OpCode {
+	// RND Vx, byte (CXNN)
+	vx := mustAs[token.Register](r.expression[1])
+	literal := mustAs[token.NumericLiteral](r.expression[2])
 
 	if vx.Value[0] != 'V' {
 		panic("invalid RND instruction")
 	}
-
 	x := vx.Value[1]
 
-	num, ok := expression[2].(token.NumericLiteral)
-
-	if !ok {
-		panic("invalid RND instruction")
-	}
-
-	msb := 0x80 | x
-	lsb := byte(num.Value)
-	c.appendOpcode(msb, lsb)
+	return NewOpCodePXSS(0xC0, x, byte(literal.Value))
 }
 
-func (c *CodeGenerator) processDRWInstruction(expression token.Expression) {
-	// DRW Vx, Vy, nibble | DXYN
+type DRW struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid DRW instruction")
-	}
+func (d DRW) generate() *OpCode {
+	// DRW Vx, Vy, N (DXYN)
+	vx := mustAs[token.Register](d.expression[1])
+	vy := mustAs[token.Register](d.expression[2])
+	literal := mustAs[token.NumericLiteral](d.expression[3])
+
 	if vx.Value[0] != 'V' {
-		panic("invalid DRW instruction")
-	}
-
-	vy, ok := expression[2].(token.Register)
-	if !ok {
 		panic("invalid DRW instruction")
 	}
 	if vy.Value[0] != 'V' {
 		panic("invalid DRW instruction")
 	}
 
-	num, ok := expression[3].(token.NumericLiteral)
-	if !ok {
-		panic("invalid DRW instruction")
-	}
-
 	x := vx.Value[1]
 	y := vy.Value[1]
-	n := uint8(num.Value)
+	n := uint8(literal.Value)
 
-	msb := 0xD0 | x
-	lsb := (y << 4) | n
-	c.appendOpcode(msb, lsb)
+	return NewOpCodePXYS(0xD0, x, y, n)
 }
 
-func (c *CodeGenerator) processSKPInstruction(expression token.Expression) {
-	// SKP Vx | EX9E
+type SKP struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SKP instruction")
-	}
+func (s SKP) generate() *OpCode {
+	// SKP Vx (EX9E)
+	vx := mustAs[token.Register](s.expression[1])
+
 	if vx.Value[0] != 'V' {
 		panic("invalid SKP instruction")
 	}
-
 	x := vx.Value[1]
 
-	msb := 0xE0 | x
-	lsb := byte(0x9E)
-	c.appendOpcode(msb, lsb)
+	return NewOpCodePXNN(0xE0, x, 0x9E)
 }
 
-func (c *CodeGenerator) processSKPNInstruction(expression token.Expression) {
-	// SKNP Vx | EXA1
+type SKNP struct {
+	expression token.Expression
+}
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SKP instruction")
-	}
+func (s SKNP) generate() *OpCode {
+	// SKNP Vx (EXA1)
+	vx := mustAs[token.Register](s.expression[1])
+
 	if vx.Value[0] != 'V' {
 		panic("invalid SKP instruction")
 	}
-
 	x := vx.Value[1]
 
-	msb := 0xE0 | x
-	lsb := byte(0xA1)
-	c.appendOpcode(msb, lsb)
+	return NewOpCodePXNN(0xE0, x, 0xA1)
 }
 
-func (c *CodeGenerator) processSKNPInstruction(expression token.Expression) {
-	// SKNP Vx | EXA1
+func (c *CodeGenerator) getInstructionGenerator(expression token.Expression) InstructionGenerator {
+	instruction := expression[0].(token.Instruction)
 
-	vx, ok := expression[1].(token.Register)
-	if !ok {
-		panic("invalid SKP instruction")
+	switch instruction.Value {
+	case string(token.CLS):
+		return CLS{}
+	case string(token.RET):
+		return RET{}
+	case string(token.JP):
+		return JP{
+			expression: expression,
+			labels:     c.labels,
+		}
+	case string(token.CALL):
+		return CALL{
+			expression: expression,
+			labels:     c.labels,
+		}
+	case string(token.SE):
+		return SE{
+			expression: expression,
+		}
+	case string(token.SNE):
+		return SNE{
+			expression: expression,
+		}
+	case string(token.LD):
+		return LD{
+			expression: expression,
+		}
+	case string(token.ADD):
+		return ADD{
+			expression: expression,
+		}
+	case string(token.SUB):
+		return SUB{
+			expression: expression,
+		}
+	case string(token.SUBN):
+		return SUBN{
+			expression: expression,
+		}
+	case string(token.OR):
+		return OR{
+			expression: expression,
+		}
+	case string(token.AND):
+		return AND{
+			expression: expression,
+		}
+	case string(token.XOR):
+		return XOR{
+			expression: expression,
+		}
+	case string(token.SHR):
+		return SHR{
+			expression: expression,
+		}
+	case string(token.SHL):
+		return SHL{
+			expression: expression,
+		}
+	case string(token.RND):
+		return RND{
+			expression: expression,
+		}
+	case string(token.DRW):
+		return DRW{
+			expression: expression,
+		}
+	case string(token.SKP):
+		return SKP{
+			expression: expression,
+		}
+	case string(token.SKNP):
+		return SKNP{
+			expression: expression,
+		}
+	default:
+		panic("invalid instruction")
 	}
-	if vx.Value[0] != 'V' {
-		panic("invalid SKP instruction")
-	}
-
-	x := vx.Value[1]
-
-	msb := 0xE0 | x
-	lsb := byte(0xA1)
-	c.appendOpcode(msb, lsb)
 }
