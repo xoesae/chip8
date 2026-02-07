@@ -82,7 +82,10 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		logger.Get().Debug("0x9000") // SNE
 		return
 	case 0xA000:
-		logger.Get().Debug("0xA000")
+		logger.Get().Debug(fmt.Sprintf("I = %d", opcode.NNN))
+
+		cpu.i = opcode.NNN
+
 		return
 	case 0xB000:
 		logger.Get().Debug("0xB000")
