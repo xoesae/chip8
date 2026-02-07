@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"fyne.io/fyne/v2/app"
@@ -16,7 +15,7 @@ const MemorySize uint16 = 4096
 
 func main() {
 
-	logger.Init("info") // debug - info
+	logger.Init("debug") // debug - info
 
 	romFile := os.Args[1]
 
@@ -47,6 +46,6 @@ func main() {
 
 	logger.Get().Info("Stopping emulator")
 
-	fmt.Println("\nRAM")
-	mem.Print()
+	//fmt.Println("\nRAM")
+	//mem.Print()
 }

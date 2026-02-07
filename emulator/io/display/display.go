@@ -68,8 +68,8 @@ func (d *Display) eventLoop() {
 		switch ev.(type) {
 		case event.DisplayClearEvent:
 			d.clearDisplay()
-		case event.PixelUpdatedEvent:
-			evt := ev.(event.PixelUpdatedEvent)
+		case event.DisplayUpdatedEvent:
+			evt := ev.(event.DisplayUpdatedEvent)
 			d.updatePixel(evt)
 		default:
 			logger.Get().Debug("Event ignored", ev)
@@ -82,27 +82,34 @@ func (d *Display) clearDisplay() {
 		for i := 0; i < DisplayHeight; i++ {
 			for j := 0; j < DisplayWidth; j++ {
 				d.pixels[i][j].FillColor = color.Black
-				d.pixels[i][j].Refresh()
+				//d.pixels[i][j].Refresh()
 			}
 		}
+
+		d.grid.Refresh()
 	})
 
 	logger.Get().Debug("Display clear")
 }
 
-func (d *Display) updatePixel(evt event.PixelUpdatedEvent) {
-	if evt.X >= 0 && evt.X < DisplayWidth && evt.Y >= 0 && evt.Y < DisplayHeight {
-		fyne.Do(func() {
-			pixelColor := color.Black
-			if evt.State {
-				pixelColor = color.White
-			}
-			d.pixels[evt.Y][evt.X].FillColor = pixelColor
-			d.pixels[evt.Y][evt.X].Refresh()
-		})
-	}
+func (d *Display) updatePixel(evt event.DisplayUpdatedEvent) {
+	fyne.Do(func() {
+		for i := 0; i < DisplayHeight; i++ {
+			for j := 0; j < DisplayWidth; j++ {
+				_color := color.Black
+				if evt.Pixels[i][j] {
+					_color = color.White
+				}
 
-	logger.Get().Debug("Display updated", evt)
+				d.pixels[i][j].FillColor = _color
+				//d.pixels[i][j].Refresh()
+			}
+		}
+
+		d.grid.Refresh()
+	})
+
+	logger.Get().Debug("Display updated")
 }
 
 func (d *Display) Show() {

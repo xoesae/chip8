@@ -13,7 +13,7 @@ func (p *PC) Count() {
 }
 
 func (p *PC) JumpTo(address uint16) {
-	p.current = address
+	p.current = address + 0x200 // recurso técnico improvisado
 }
 
 func (p *PC) Current() uint16 {

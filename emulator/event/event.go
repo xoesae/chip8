@@ -4,7 +4,7 @@ type EventType int
 
 const (
 	DisplayClearEventType EventType = iota
-	PixelUpdatedEventType
+	DisplayUpdatedEventType
 )
 
 type Event interface {
@@ -15,9 +15,8 @@ type DisplayClearEvent struct{}
 
 func (DisplayClearEvent) Type() EventType { return DisplayClearEventType }
 
-type PixelUpdatedEvent struct {
-	State bool
-	X, Y  int
+type DisplayUpdatedEvent struct {
+	Pixels [32][64]bool
 }
 
-func (PixelUpdatedEvent) Type() EventType { return PixelUpdatedEventType }
+func (DisplayUpdatedEvent) Type() EventType { return DisplayUpdatedEventType }

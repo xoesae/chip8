@@ -31,7 +31,9 @@ func (c *ControlUnit) fetch(cpu *CPU) Opcode {
 func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	opcode := c.fetch(cpu)
 
-	logger.Get().Debug("Opcode: 0x%04X\n", opcode.Raw)
+	if opcode.Raw != 0x00 {
+		logger.Get().Debug(fmt.Sprintf("Opcode: 0x%04X", opcode.Raw))
+	}
 
 	switch opcode.Group {
 	case 0x0000:
@@ -52,23 +54,32 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		logger.Get().Debug("0x4000")
 		return
 	case 0x5000:
-		logger.Get().Debug("0x5000")
+		logger.Get().Debug(fmt.Sprintf("SE V%d, V%d", opcode.X, opcode.Y))
+
+		if cpu.v[opcode.X] == cpu.v[opcode.Y] {
+			// Ignore next instruction, add +2 on program counter
+			cpu.pc.Count()
+
+			logger.Get().Debug(fmt.Sprintf("V%d == V%d", opcode.X, opcode.Y))
+		}
+
 		return
 	case 0x6000:
 		// v[x] := NN
-		logger.Get().Debug(fmt.Sprintf("V%d := %d\n", opcode.X, opcode.NN))
+		logger.Get().Debug(fmt.Sprintf("V%d := %d", opcode.X, opcode.NN))
 		cpu.v[opcode.X] = opcode.NN
 		return
 	case 0x7000:
 		// v[x] += NN
-		logger.Get().Debug(fmt.Sprintf("V%d += %d\n", opcode.X, opcode.NN))
+		logger.Get().Debug(fmt.Sprintf("V%d += %d", opcode.X, opcode.NN))
 		cpu.v[opcode.X] += opcode.NN
+		logger.Get().Debug(fmt.Sprintf("V%d == %d", opcode.X, cpu.v[opcode.X]))
 		return
 	case 0x8000:
 		c.handle8Group(cpu, opcode)
 		return
 	case 0x9000:
-		logger.Get().Debug("0x9000")
+		logger.Get().Debug("0x9000") // SNE
 		return
 	case 0xA000:
 		logger.Get().Debug("0xA000")
@@ -82,52 +93,49 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0xD000:
 		logger.Get().Debug("DRW")
 
-		vx := int(cpu.v[opcode.X]) % display.DisplayWidth
-		vy := int(cpu.v[opcode.Y]) % display.DisplayHeight
+		vx := int(cpu.v[opcode.X])
+		vy := int(cpu.v[opcode.Y])
 
+		cpu.v[0xF] = 0
 		collision := false
 
 		for row := 0; row < int(opcode.N); row++ {
 			_addr := cpu.i + uint16(row)
-			if _addr >= 0xFFF {
-				continue
-			}
+			//if _addr >= 0xFFF {
+			//	continue
+			//}
 
 			// get the byte from db instruction [F8 F8 F8 F8 F8] and add the 0x200 from chip8 offset program
 			spriteByte := cpu.memory.Read(_addr + 0x200)
 
 			// 1 byte column
 			for col := 0; col < 8; col++ {
-				bit := (spriteByte & (0x80 >> col)) != 0
-				if !bit {
+				if spriteByte&(0x80>>uint(col)) == 0 {
 					continue
 				}
 
 				x := (vx + col) % display.DisplayWidth
 				y := (vy + row) % display.DisplayHeight
 
-				wasOn := cpu.display[y][x]
-				cpu.display[y][x] = !wasOn
+				// [0, 0, 0, 1, 1]
+				// [0, 1, 1, 0, 0]
+				// [0, 1, 1, 0, 0]
+				// [0, 1, 1, 0, 0]
 
-				if wasOn {
+				if cpu.display[y][x] {
 					collision = true
 				}
-
-				ev := event.PixelUpdatedEvent{
-					X: x, Y: y,
-					State: cpu.display[y][x],
-				}
-
-				cpu.emitEvent(ev)
+				cpu.display[y][x] = !cpu.display[y][x]
 			}
-
 		}
 
 		if collision {
 			cpu.v[0xF] = 1
-		} else {
-			cpu.v[0xF] = 0
 		}
+
+		cpu.emitEvent(event.DisplayUpdatedEvent{
+			Pixels: cpu.display,
+		})
 
 		return
 	case 0xE000:
