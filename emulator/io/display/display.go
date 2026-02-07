@@ -1,13 +1,13 @@
 package display
 
 import (
-	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"github.com/xoesae/chip8/emulator/event"
+	"github.com/xoesae/chip8/logger"
 )
 
 const (
@@ -72,7 +72,7 @@ func (d *Display) eventLoop() {
 			evt := ev.(event.PixelUpdatedEvent)
 			d.updatePixel(evt)
 		default:
-			fmt.Printf("EVENT: IGNORED %T\n", ev)
+			logger.Get().Debug("Event ignored", ev)
 		}
 	}
 }
@@ -86,7 +86,8 @@ func (d *Display) clearDisplay() {
 			}
 		}
 	})
-	fmt.Println("EVENT: DISPLAY CLEAR")
+
+	logger.Get().Debug("Display clear")
 }
 
 func (d *Display) updatePixel(evt event.PixelUpdatedEvent) {
@@ -100,7 +101,8 @@ func (d *Display) updatePixel(evt event.PixelUpdatedEvent) {
 			d.pixels[evt.Y][evt.X].Refresh()
 		})
 	}
-	fmt.Printf("EVENT: DISPLAY UPDATE %+v\n", evt)
+
+	logger.Get().Debug("Display updated", evt)
 }
 
 func (d *Display) Show() {

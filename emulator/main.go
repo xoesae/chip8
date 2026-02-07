@@ -9,12 +9,18 @@ import (
 	"github.com/xoesae/chip8/emulator/event"
 	"github.com/xoesae/chip8/emulator/io/display"
 	"github.com/xoesae/chip8/emulator/memory"
+	"github.com/xoesae/chip8/logger"
 )
 
 const MemorySize uint16 = 4096
 
 func main() {
+
+	logger.Init("info") // debug - info
+
 	romFile := os.Args[1]
+
+	logger.Get().Debug("Loading ROM " + romFile)
 
 	// memory
 	mem := memory.NewMemory(MemorySize)
@@ -23,10 +29,13 @@ func main() {
 	// EventBus
 	eventChannel := make(chan event.Event)
 
+	logger.Get().Debug("Starting emulator")
 	c := cpu.NewCPU(mem, eventChannel)
 	go c.Run(60)
 
 	// output
+
+	logger.Get().Info("Starting display")
 	a := app.New()
 	_display := display.NewDisplay(&a, eventChannel)
 	_display.StartEventLoop()
@@ -35,6 +44,8 @@ func main() {
 
 	//fmt.Println("\nRegisters")
 	//c.PrintRegisters()
+
+	logger.Get().Info("Stopping emulator")
 
 	fmt.Println("\nRAM")
 	mem.Print()
