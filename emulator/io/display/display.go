@@ -1,89 +1,117 @@
 package display
 
 import (
-	"image"
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
+	"github.com/xoesae/chip8/emulator/event"
 )
 
 const (
-	width  = 64
-	height = 32
-	scale  = 10
+	DisplayWidth  = 64
+	DisplayHeight = 32
+	PixelSize     = 10
 )
 
 type Display struct {
-	pixels      [height][width]bool
-	Window      fyne.Window
-	raster      *canvas.Raster
-	pixelCanvas [height][width]*canvas.Rectangle
+	app    *fyne.App
+	window *fyne.Window
+	pixels [][]*canvas.Rectangle
+	grid   *fyne.Container
+	events chan event.Event
 }
 
-func NewDisplay() *Display {
-	a := app.New()
-	w := a.NewWindow("Chip-8 Emulator")
-	w.Resize(fyne.NewSize(width*scale, height*scale))
+func NewDisplay(a *fyne.App, eventsChannel chan event.Event) *Display {
+	window := (*a).NewWindow("CHIP-8")
+	window.Resize(fyne.NewSize(DisplayWidth*PixelSize, DisplayHeight*PixelSize))
 
-	d := &Display{
-		Window: w,
+	pixels := make([][]*canvas.Rectangle, DisplayHeight)
+	grid := container.NewGridWithColumns(DisplayWidth)
+
+	for y := 0; y < DisplayHeight; y++ {
+		pixels[y] = make([]*canvas.Rectangle, DisplayWidth)
+
+		for x := 0; x < DisplayWidth; x++ {
+			rect := canvas.NewRectangle(color.Black)
+			rect.SetMinSize(fyne.NewSize(PixelSize, PixelSize))
+			pixels[y][x] = rect
+			grid.Add(rect)
+		}
 	}
 
-	d.raster = canvas.NewRaster(func(w, h int) image.Image {
-		img := image.NewRGBA(image.Rect(0, 0, width, height))
-		for y := 0; y < height; y++ {
-			for x := 0; x < width; x++ {
-				if d.pixels[y][x] {
-					img.Set(x, y, color.White)
-				} else {
-					img.Set(x, y, color.Black)
-				}
-			}
-		}
-		return img
-	})
-	d.raster.ScaleMode = canvas.ImageScalePixels
+	d := &Display{
+		app:    a,
+		window: &window,
+		pixels: pixels,
+		grid:   grid,
+		events: eventsChannel,
+	}
 
-	w.SetContent(d.raster)
+	window.SetContent(grid)
+
 	return d
 }
 
-func (d *Display) Refresh() {
-	d.raster.Refresh()
+func (d *Display) Events() chan<- event.Event {
+	return d.events
 }
 
-func (d *Display) Clear() {
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			d.pixels[y][x] = false
+func (d *Display) StartEventLoop() {
+	go d.eventLoop()
+}
+
+func (d *Display) eventLoop() {
+	for ev := range d.events {
+		switch ev.(type) {
+		case event.DisplayClearEvent:
+			d.clearDisplay()
+		case event.PixelUpdatedEvent:
+			evt := ev.(event.PixelUpdatedEvent)
+			d.updatePixel(evt)
+		default:
+			fmt.Printf("EVENT: IGNORED %T\n", ev)
 		}
 	}
-	d.Refresh()
 }
 
-func (d *Display) DrawSprite(x, y int, sprite []byte) bool {
-	collision := false
-
-	for row, data := range sprite {
-		for col := 0; col < 8; col++ {
-			if (data & (0x80 >> col)) != 0 {
-				px := (x + col) % width
-				py := (y + row) % height
-				if d.pixels[py][px] {
-					collision = true
-				}
-				d.pixels[py][px] = !d.pixels[py][px]
+func (d *Display) clearDisplay() {
+	fyne.Do(func() {
+		for i := 0; i < DisplayHeight; i++ {
+			for j := 0; j < DisplayWidth; j++ {
+				d.pixels[i][j].FillColor = color.Black
+				d.pixels[i][j].Refresh()
 			}
 		}
+	})
+	fmt.Println("EVENT: DISPLAY CLEAR")
+}
+
+func (d *Display) updatePixel(evt event.PixelUpdatedEvent) {
+	if evt.X >= 0 && evt.X < DisplayWidth && evt.Y >= 0 && evt.Y < DisplayHeight {
+		fyne.Do(func() {
+			pixelColor := color.Black
+			if evt.State {
+				pixelColor = color.White
+			}
+			d.pixels[evt.Y][evt.X].FillColor = pixelColor
+			d.pixels[evt.Y][evt.X].Refresh()
+		})
 	}
+	fmt.Printf("EVENT: DISPLAY UPDATE %+v\n", evt)
+}
 
-	d.Refresh()
-
-	return collision
+func (d *Display) Show() {
+	(*d.window).Show()
 }
 
 func (d *Display) Run() {
-	d.Window.ShowAndRun()
+	(*d.window).ShowAndRun()
+}
+
+func (d *Display) Close() {
+	close(d.events)
+	(*d.window).Close()
 }

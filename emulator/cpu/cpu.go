@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/xoesae/chip8/emulator/event"
 	"github.com/xoesae/chip8/emulator/io/display"
 	"github.com/xoesae/chip8/emulator/memory"
 )
@@ -16,26 +17,30 @@ type CPU struct {
 	sp         byte // StackPointer
 	delayTimer byte
 	soundTimer byte
-	memory     *memory.Memory
-	cu         *ControlUnit
-	display    *display.Display
+
+	memory  *memory.Memory
+	cu      *ControlUnit
+	display [display.DisplayHeight][display.DisplayWidth]bool
+
+	eventChannel chan event.Event
 
 	running bool
 }
 
-func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
+func NewCPU(mem *memory.Memory, eventChan chan event.Event) *CPU {
 	pc := NewPC()
 
 	return &CPU{
-		v:          [16]byte{},
-		i:          0x300,
-		pc:         pc,
-		stack:      [16]uint16{},
-		delayTimer: 0,
-		soundTimer: 0,
-		memory:     mem,
-		display:    d,
-		running:    false,
+		v:            [16]byte{},
+		i:            0x300,
+		pc:           pc,
+		stack:        [16]uint16{},
+		delayTimer:   0,
+		soundTimer:   0,
+		memory:       mem,
+		cu:           &ControlUnit{},
+		eventChannel: eventChan,
+		running:      false,
 	}
 }
 
@@ -64,6 +69,10 @@ func (c *CPU) updateTimers() {
 	}
 }
 
+func (c *CPU) emitEvent(e event.Event) {
+	c.eventChannel <- e
+}
+
 func (c *CPU) Run(fps int) {
 	c.running = true
 
@@ -77,7 +86,6 @@ func (c *CPU) Run(fps int) {
 		select {
 		case <-cpuTick.C:
 			c.step()
-			c.display.Refresh()
 		case <-timerTick.C:
 			c.updateTimers()
 		}

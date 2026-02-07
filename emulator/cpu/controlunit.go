@@ -2,6 +2,9 @@ package cpu
 
 import (
 	"fmt"
+
+	"github.com/xoesae/chip8/emulator/event"
+	"github.com/xoesae/chip8/emulator/io/display"
 )
 
 type ControlUnit struct{}
@@ -29,69 +32,123 @@ func (c *ControlUnit) fetch(cpu *CPU) Opcode {
 func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	opcode := c.fetch(cpu)
 
-	//fmt.Printf("opcode: 0x%04X\n", opcode.Raw)
+	fmt.Printf("opcode: 0x%04X\n", opcode.Raw)
 
 	switch opcode.Group {
 	case 0x0000:
 		c.handle0Group(cpu, opcode)
+		return
 	case 0x1000:
 		fmt.Println("JUMP NNN")
 		cpu.pc.JumpTo(opcode.NNN)
+		return
 	case 0x2000:
+		// CALL
 		fmt.Println("0x2000")
+		return
 	case 0x3000:
 		fmt.Println("0x3000")
+		return
 	case 0x4000:
 		fmt.Println("0x4000")
+		return
 	case 0x5000:
 		fmt.Println("0x5000")
+		return
 	case 0x6000:
 		// v[x] := NN
 		fmt.Printf("V%d := %d\n", opcode.X, opcode.NN)
 		cpu.v[opcode.X] = opcode.NN
+		return
 	case 0x7000:
 		// v[x] += NN
 		fmt.Printf("V%d += %d\n", opcode.X, opcode.NN)
 		cpu.v[opcode.X] += opcode.NN
+		return
 	case 0x8000:
 		c.handle8Group(cpu, opcode)
+		return
 	case 0x9000:
 		fmt.Println("0x9000")
+		return
 	case 0xA000:
 		fmt.Println("0xA000")
+		return
 	case 0xB000:
 		fmt.Println("0xB000")
+		return
 	case 0xC000:
 		fmt.Println("0xC000")
+		return
 	case 0xD000:
-		//fmt.Println("0xD000")
-		// Draw
-		vx := cpu.v[opcode.X]
-		vy := cpu.v[opcode.Y]
+		fmt.Println("DRW")
 
-		sprite := make([]byte, uint16(opcode.N))
-		for i := uint16(0); i < uint16(opcode.N); i++ {
-			sprite[i] = cpu.memory.Read(cpu.i + i)
+		vx := int(cpu.v[opcode.X]) % display.DisplayWidth
+		vy := int(cpu.v[opcode.Y]) % display.DisplayHeight
+
+		collision := false
+
+		for row := 0; row < int(opcode.N); row++ {
+			_addr := cpu.i + uint16(row)
+			if _addr >= 0xFFF {
+				continue
+			}
+
+			// get the byte from db instruction [F8 F8 F8 F8 F8] and add the 0x200 from chip8 offset program
+			spriteByte := cpu.memory.Read(_addr + 0x200)
+
+			// 1 byte column
+			for col := 0; col < 8; col++ {
+				bit := (spriteByte & (0x80 >> col)) != 0
+				if !bit {
+					continue
+				}
+
+				x := (vx + col) % display.DisplayWidth
+				y := (vy + row) % display.DisplayHeight
+
+				wasOn := cpu.display[y][x]
+				cpu.display[y][x] = !wasOn
+
+				if wasOn {
+					collision = true
+				}
+
+				ev := event.PixelUpdatedEvent{
+					X: x, Y: y,
+					State: cpu.display[y][x],
+				}
+
+				cpu.emitEvent(ev)
+			}
+
 		}
-
-		collision := cpu.display.DrawSprite(int(vx), int(vy), sprite)
 
 		if collision {
 			cpu.v[0xF] = 1
 		} else {
 			cpu.v[0xF] = 0
 		}
+
+		return
 	case 0xE000:
 		fmt.Println("0xE000")
+		return
 	case 0xF000:
 		c.handleFGroup(cpu, opcode)
+		return
 	}
 }
 
 func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 	switch opcode.Raw & 0x00FF {
 	case 0xE0:
-		cpu.display.Clear()
+		for y := 0; y < display.DisplayHeight; y++ {
+			for x := 0; x < display.DisplayWidth; x++ {
+				cpu.display[y][x] = false
+			}
+		}
+		cpu.emitEvent(event.DisplayClearEvent{})
 	case 0xEE:
 		fmt.Println("Return")
 	}

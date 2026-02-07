@@ -1,15 +1,18 @@
-            org $200
+org $300
+square
+    db $F8 $F8 $F8 $F8 $F8
 
-; Sprites
-num1
-            db $20 $60 $20 $20 $70
+org $0
 
 start
-            LD I, #num1      ; Point I to the `1` sprite
-            LD V0, 16        ; Load the x value of the sprite
-            LD V1, 16        ; Load the y value of the sprite
+    LD    I, #square      ; Carrega endereço do sprite
+    LD    V0, 30          ; X = 30
+    LD    V1, 13          ; Y = 13
+    CLS                   ; Limpa tela
 
-            DRW V0, V1, 5    ; Draw the sprite
+loop
+    DRW   V0, V1, 5       ; Desenha quadrado 5x5 pixels
+    JP    #loop           ; Loop infinito
 
-end         JP #end          ; loop forever
-
+end
+    JP    #end
