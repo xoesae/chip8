@@ -35,4 +35,19 @@
 - [x] FX55 
 - [x] FX65 
 
-# ...
+# DRAW
+
+Hex is converted to binary and the 1's is a ON pixels, and 0's is OFF pixels
+
+| Hex | Binary   | Pixels   |
+|-----|----------|----------|
+| F0  | 11110000 | ####.... |
+| 90  | 10010000 | #..#.... |
+| 90  | 10010000 | #..#.... |
+| 90  | 10010000 | #..#.... |
+| F0  | 11110000 | ####.... |
+
+
+# References
+
+- https://github.com/mattmikolay/chip-8/wiki/Mastering-CHIP%E2%80%908

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"fyne.io/fyne/v2/app"
@@ -46,6 +47,6 @@ func main() {
 
 	logger.Get().Info("Stopping emulator")
 
-	//fmt.Println("\nRAM")
-	//mem.Print()
+	fmt.Println("\nRAM")
+	mem.Print()
 }

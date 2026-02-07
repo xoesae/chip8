@@ -102,18 +102,27 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		cpu.v[0xF] = 0
 		collision := false
 
+		// 0..5
 		for row := 0; row < int(opcode.N); row++ {
 			_addr := cpu.i + uint16(row)
-			//if _addr >= 0xFFF {
-			//	continue
-			//}
-
-			// get the byte from db instruction [F8 F8 F8 F8 F8] and add the 0x200 from chip8 offset program
 			spriteByte := cpu.memory.Read(_addr + 0x200)
 
 			// 1 byte column
 			for col := 0; col < 8; col++ {
-				if spriteByte&(0x80>>uint(col)) == 0 {
+				// 0x80 == 1000 0000
+				// 0x80>>1 == 0100 0000
+				// 0x80>>2 == 0010 0000
+				// 0x80>>3 == 0001 0000
+				// ...
+				shiftedCol := byte(0x80 >> uint(col))
+
+				// spriteByte == 0xF0 (1111 0000)
+				// spriteByte&1000 0000 == 1000 0000
+				// spriteByte&0100 0000 == 0100 0000
+				// spriteByte&0010 0000 == 0010 0000
+				// ...
+				// spriteByte&0000 1000 == 0000 0000 -> no pixel ON
+				if spriteByte&shiftedCol == 0 {
 					continue
 				}
 
@@ -128,12 +137,15 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 				if cpu.display[y][x] {
 					collision = true
 				}
+
 				cpu.display[y][x] = !cpu.display[y][x]
 			}
 		}
 
 		if collision {
 			cpu.v[0xF] = 1
+		} else {
+			cpu.v[0xF] = 0
 		}
 
 		cpu.emitEvent(event.DisplayUpdatedEvent{
