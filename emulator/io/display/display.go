@@ -72,7 +72,7 @@ func (d *Display) eventLoop() {
 			evt := ev.(event.DisplayUpdatedEvent)
 			d.updatePixel(evt)
 		default:
-			logger.Get().Debug("Event ignored", ev)
+			logger.Get().Debug("Event ignored")
 		}
 	}
 }

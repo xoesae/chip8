@@ -1,11 +1,14 @@
 package cpu
 
 type PC struct {
-	current uint16
+	current, i uint16
 }
 
-func NewPC() *PC {
-	return &PC{current: 0x200}
+func NewPC(i uint16) *PC {
+	return &PC{
+		current: i,
+		i:       i,
+	}
 }
 
 func (p *PC) Count() {
@@ -13,7 +16,7 @@ func (p *PC) Count() {
 }
 
 func (p *PC) JumpTo(address uint16) {
-	p.current = address + 0x200 // recurso técnico improvisado
+	p.current = address + p.i
 }
 
 func (p *PC) Current() uint16 {

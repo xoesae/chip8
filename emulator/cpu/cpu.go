@@ -28,11 +28,13 @@ type CPU struct {
 }
 
 func NewCPU(mem *memory.Memory, eventChan chan event.Event) *CPU {
-	pc := NewPC()
+	i := uint16(0x200)
+
+	pc := NewPC(i)
 
 	return &CPU{
 		v:            [16]byte{},
-		i:            0x300,
+		i:            i,
 		pc:           pc,
 		stack:        [16]uint16{},
 		delayTimer:   0,
