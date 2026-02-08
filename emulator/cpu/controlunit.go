@@ -180,19 +180,19 @@ func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
 	switch opcode.N {
 	case 0x0: // 8XY0
-		logger.Get().Debug(fmt.Sprintf("V%d := V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d := V%d", opcode.X, opcode.Y))
 		cpu.v[opcode.X] = cpu.v[opcode.Y]
 	case 0x1: // 8XY1
-		logger.Get().Debug(fmt.Sprintf("V%d |= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d |= V%d", opcode.X, opcode.Y))
 		cpu.v[opcode.X] |= cpu.v[opcode.Y]
 	case 0x2: // 8XY2
-		logger.Get().Debug(fmt.Sprintf("V%d &= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d &= V%d", opcode.X, opcode.Y))
 		cpu.v[opcode.X] &= cpu.v[opcode.Y]
 	case 0x3: // 8XY3
-		logger.Get().Debug(fmt.Sprintf("V%d ^= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d ^= V%d", opcode.X, opcode.Y))
 		cpu.v[opcode.X] ^= cpu.v[opcode.Y]
 	case 0x4: // 8XY4
-		logger.Get().Debug(fmt.Sprintf("V%d += V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d += V%d", opcode.X, opcode.Y))
 		sum := uint16(cpu.v[opcode.X]) + uint16(cpu.v[opcode.Y])
 		if sum > 0xFF {
 			cpu.v[0xF] = 1 // set carry
@@ -201,7 +201,7 @@ func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
 		}
 		cpu.v[opcode.X] = byte(sum & 0xFF)
 	case 0x5: // 8XY5
-		logger.Get().Debug(fmt.Sprintf("V%d -= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d -= V%d", opcode.X, opcode.Y))
 		if cpu.v[opcode.X] > cpu.v[opcode.Y] {
 			cpu.v[0xF] = 1
 		} else {
@@ -209,11 +209,11 @@ func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
 		}
 		cpu.v[opcode.X] -= cpu.v[opcode.Y]
 	case 0x6: // 8XY6
-		logger.Get().Debug(fmt.Sprintf("V%d >>= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d >>= V%d", opcode.X, opcode.Y))
 		cpu.v[0xF] = cpu.v[opcode.X] & 0x1
 		cpu.v[opcode.X] >>= 1
 	case 0x7: // 8XY7
-		logger.Get().Debug(fmt.Sprintf("V%d =- V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d =- V%d", opcode.X, opcode.Y))
 		if cpu.v[opcode.Y] > cpu.v[opcode.X] {
 			cpu.v[0xF] = 1
 		} else {
@@ -221,7 +221,7 @@ func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
 		}
 		cpu.v[opcode.X] = cpu.v[opcode.Y] - cpu.v[opcode.X]
 	case 0xE: // 8XYE
-		logger.Get().Debug(fmt.Sprintf("V%d <<= V%d\n", opcode.X, opcode.Y))
+		logger.Get().Debug(fmt.Sprintf("V%d <<= V%d", opcode.X, opcode.Y))
 		cpu.v[0xF] = (cpu.v[opcode.X] & 0x80) >> 7
 		cpu.v[opcode.X] <<= 1
 	}
@@ -231,13 +231,16 @@ func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
 	x := uint16(opcode.X)
 
 	switch opcode.NN {
+	case 0x0A:
+		logger.Get().Debug(fmt.Sprintf("LD V%d, K", opcode.X))
+		return
 	case 0x55: // FX55
-		logger.Get().Debug(fmt.Sprintf("SAVE V%d\n", opcode.X))
+		logger.Get().Debug(fmt.Sprintf("SAVE V%d", opcode.X))
 		for i := uint16(0); i <= x; i++ {
 			cpu.memory.Write(cpu.i+i, cpu.v[i])
 		}
 	case 0x65: // FX65
-		logger.Get().Debug(fmt.Sprintf("LOAD V%d\n", opcode.X))
+		logger.Get().Debug(fmt.Sprintf("LOAD V%d", opcode.X))
 		for i := uint16(0); i <= x; i++ {
 			cpu.v[i] = cpu.memory.Read(cpu.i + i)
 		}
