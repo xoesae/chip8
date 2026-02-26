@@ -7,29 +7,11 @@ import (
 	"github.com/xoesae/chip8/logger"
 )
 
-type ControlUnit struct{}
-
-// Fetch returns opcode from actual PC
-func (c *ControlUnit) fetch(cpu *CPU) Opcode {
-	high := uint16(cpu.memory.Read(cpu.pc.Current()))
-	low := uint16(cpu.memory.Read(cpu.pc.Current() + 1))
-
-	opcode := (high << 8) | low
-
-	// TODO: move this to opcode.go
-	return Opcode{
-		Raw:   opcode,
-		Group: opcode & 0xF000,
-		X:     byte((opcode & 0x0F00) >> 8),
-		Y:     byte((opcode & 0x00F0) >> 4),
-		N:     byte(opcode & 0x000F),
-		NN:    byte(opcode & 0x00FF),
-		NNN:   opcode & 0x0FFF,
-	}
-}
-
-func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
-	opcode := c.fetch(cpu)
+func (c *CPU) executeCycle() {
+	opcode := NewOpcode(
+		c.memory.Read(c.pc.Current()),
+		c.memory.Read(c.pc.Current()+1),
+	)
 
 	if opcode.Raw != 0x00 {
 		logger.Get().Debug(fmt.Sprintf("Opcode: 0x%04X", opcode.Raw))
@@ -37,11 +19,11 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 
 	switch opcode.Group {
 	case 0x0000:
-		c.handle0Group(cpu, opcode)
+		c.handle0Group(opcode)
 		return
 	case 0x1000:
 		logger.Get().Debug("JUMP NNN")
-		cpu.pc.JumpTo(opcode.NNN)
+		c.pc.JumpTo(opcode.NNN)
 		return
 	case 0x2000:
 		// CALL
@@ -50,9 +32,9 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0x3000:
 		logger.Get().Debug(fmt.Sprintf("SE V%d, %d", opcode.X, opcode.NN))
 
-		if cpu.v[opcode.X] == opcode.NN {
+		if c.v[opcode.X] == opcode.NN {
 			// Ignore next instruction, add +2 on program counter
-			cpu.pc.Count()
+			c.pc.Count()
 
 			logger.Get().Debug(fmt.Sprintf("V%d == %d", opcode.X, opcode.NN))
 		}
@@ -61,9 +43,9 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0x4000:
 		logger.Get().Debug(fmt.Sprintf("SNE V%d, %d", opcode.X, opcode.NN))
 
-		if cpu.v[opcode.X] != opcode.NN {
+		if c.v[opcode.X] != opcode.NN {
 			// Ignore next instruction, add +2 on program counter
-			cpu.pc.Count()
+			c.pc.Count()
 
 			logger.Get().Debug(fmt.Sprintf("V%d != %d", opcode.X, opcode.NN))
 		}
@@ -72,9 +54,9 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0x5000:
 		logger.Get().Debug(fmt.Sprintf("SE V%d, V%d", opcode.X, opcode.Y))
 
-		if cpu.v[opcode.X] == cpu.v[opcode.Y] {
+		if c.v[opcode.X] == c.v[opcode.Y] {
 			// Ignore next instruction, add +2 on program counter
-			cpu.pc.Count()
+			c.pc.Count()
 
 			logger.Get().Debug(fmt.Sprintf("V%d == V%d", opcode.X, opcode.Y))
 		}
@@ -83,16 +65,16 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0x6000:
 		// v[x] := NN
 		logger.Get().Debug(fmt.Sprintf("V%d := %d", opcode.X, opcode.NN))
-		cpu.v[opcode.X] = opcode.NN
+		c.v[opcode.X] = opcode.NN
 		return
 	case 0x7000:
 		// v[x] += NN
 		logger.Get().Debug(fmt.Sprintf("V%d += %d", opcode.X, opcode.NN))
-		cpu.v[opcode.X] += opcode.NN
-		logger.Get().Debug(fmt.Sprintf("V%d == %d", opcode.X, cpu.v[opcode.X]))
+		c.v[opcode.X] += opcode.NN
+		logger.Get().Debug(fmt.Sprintf("V%d == %d", opcode.X, c.v[opcode.X]))
 		return
 	case 0x8000:
-		c.handle8Group(cpu, opcode)
+		c.handle8Group(opcode)
 		return
 	case 0x9000:
 		logger.Get().Debug("0x9000") // SNE
@@ -100,7 +82,7 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0xA000:
 		logger.Get().Debug(fmt.Sprintf("I = %d", opcode.NNN))
 
-		cpu.i = opcode.NNN
+		c.i = opcode.NNN
 
 		return
 	case 0xB000:
@@ -112,16 +94,16 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 	case 0xD000:
 		logger.Get().Debug("DRW")
 
-		vx := int(cpu.v[opcode.X])
-		vy := int(cpu.v[opcode.Y])
+		vx := int(c.v[opcode.X])
+		vy := int(c.v[opcode.Y])
 
-		cpu.v[0xF] = 0
+		c.v[0xF] = 0
 		collision := false
 
 		// 0..5
 		for row := 0; row < int(opcode.N); row++ {
-			_addr := cpu.i + uint16(row)
-			spriteByte := cpu.memory.Read(_addr + 0x200)
+			_addr := c.i + uint16(row)
+			spriteByte := c.memory.Read(_addr + 0x200)
 
 			// 1 byte column
 			for col := 0; col < 8; col++ {
@@ -150,18 +132,18 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 				// [0, 1, 1, 0, 0]
 				// [0, 1, 1, 0, 0]
 
-				if cpu.pixels[y][x] {
+				if c.pixels[y][x] {
 					collision = true
 				}
 
-				cpu.pixels[y][x] = !cpu.pixels[y][x]
+				c.pixels[y][x] = !c.pixels[y][x]
 			}
 		}
 
 		if collision {
-			cpu.v[0xF] = 1
+			c.v[0xF] = 1
 		} else {
-			cpu.v[0xF] = 0
+			c.v[0xF] = 0
 		}
 
 		return
@@ -169,18 +151,18 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		logger.Get().Debug("0xE000")
 		return
 	case 0xF000:
-		c.handleFGroup(cpu, opcode)
+		c.handleFGroup(opcode)
 		return
 	}
 }
 
-func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
+func (c *CPU) handle0Group(opcode Opcode) {
 	switch opcode.Raw & 0x00FF {
 	case 0xE0:
 		logger.Get().Debug("CLEAR")
 		for y := 0; y < shared.DisplayHeight; y++ {
 			for x := 0; x < shared.DisplayWidth; x++ {
-				cpu.pixels[y][x] = false
+				c.pixels[y][x] = false
 			}
 		}
 	case 0xEE:
@@ -188,57 +170,57 @@ func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 	}
 }
 
-func (c *ControlUnit) handle8Group(cpu *CPU, opcode Opcode) {
+func (c *CPU) handle8Group(opcode Opcode) {
 	switch opcode.N {
 	case 0x0: // 8XY0
 		logger.Get().Debug(fmt.Sprintf("V%d := V%d", opcode.X, opcode.Y))
-		cpu.v[opcode.X] = cpu.v[opcode.Y]
+		c.v[opcode.X] = c.v[opcode.Y]
 	case 0x1: // 8XY1
 		logger.Get().Debug(fmt.Sprintf("V%d |= V%d", opcode.X, opcode.Y))
-		cpu.v[opcode.X] |= cpu.v[opcode.Y]
+		c.v[opcode.X] |= c.v[opcode.Y]
 	case 0x2: // 8XY2
 		logger.Get().Debug(fmt.Sprintf("V%d &= V%d", opcode.X, opcode.Y))
-		cpu.v[opcode.X] &= cpu.v[opcode.Y]
+		c.v[opcode.X] &= c.v[opcode.Y]
 	case 0x3: // 8XY3
 		logger.Get().Debug(fmt.Sprintf("V%d ^= V%d", opcode.X, opcode.Y))
-		cpu.v[opcode.X] ^= cpu.v[opcode.Y]
+		c.v[opcode.X] ^= c.v[opcode.Y]
 	case 0x4: // 8XY4
 		logger.Get().Debug(fmt.Sprintf("V%d += V%d", opcode.X, opcode.Y))
-		sum := uint16(cpu.v[opcode.X]) + uint16(cpu.v[opcode.Y])
+		sum := uint16(c.v[opcode.X]) + uint16(c.v[opcode.Y])
 		if sum > 0xFF {
-			cpu.v[0xF] = 1 // set carry
+			c.v[0xF] = 1 // set carry
 		} else {
-			cpu.v[0xF] = 0
+			c.v[0xF] = 0
 		}
-		cpu.v[opcode.X] = byte(sum & 0xFF)
+		c.v[opcode.X] = byte(sum & 0xFF)
 	case 0x5: // 8XY5
 		logger.Get().Debug(fmt.Sprintf("V%d -= V%d", opcode.X, opcode.Y))
-		if cpu.v[opcode.X] > cpu.v[opcode.Y] {
-			cpu.v[0xF] = 1
+		if c.v[opcode.X] > c.v[opcode.Y] {
+			c.v[0xF] = 1
 		} else {
-			cpu.v[0xF] = 0
+			c.v[0xF] = 0
 		}
-		cpu.v[opcode.X] -= cpu.v[opcode.Y]
+		c.v[opcode.X] -= c.v[opcode.Y]
 	case 0x6: // 8XY6
 		logger.Get().Debug(fmt.Sprintf("V%d >>= V%d", opcode.X, opcode.Y))
-		cpu.v[0xF] = cpu.v[opcode.X] & 0x1
-		cpu.v[opcode.X] >>= 1
+		c.v[0xF] = c.v[opcode.X] & 0x1
+		c.v[opcode.X] >>= 1
 	case 0x7: // 8XY7
 		logger.Get().Debug(fmt.Sprintf("V%d =- V%d", opcode.X, opcode.Y))
-		if cpu.v[opcode.Y] > cpu.v[opcode.X] {
-			cpu.v[0xF] = 1
+		if c.v[opcode.Y] > c.v[opcode.X] {
+			c.v[0xF] = 1
 		} else {
-			cpu.v[0xF] = 0
+			c.v[0xF] = 0
 		}
-		cpu.v[opcode.X] = cpu.v[opcode.Y] - cpu.v[opcode.X]
+		c.v[opcode.X] = c.v[opcode.Y] - c.v[opcode.X]
 	case 0xE: // 8XYE
 		logger.Get().Debug(fmt.Sprintf("V%d <<= V%d", opcode.X, opcode.Y))
-		cpu.v[0xF] = (cpu.v[opcode.X] & 0x80) >> 7
-		cpu.v[opcode.X] <<= 1
+		c.v[0xF] = (c.v[opcode.X] & 0x80) >> 7
+		c.v[opcode.X] <<= 1
 	}
 }
 
-func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
+func (c *CPU) handleFGroup(opcode Opcode) {
 	x := uint16(opcode.X)
 
 	switch opcode.NN {
@@ -246,11 +228,11 @@ func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
 		logger.Get().Debug(fmt.Sprintf("LD V%d, K", opcode.X))
 
 		// Wait for a keypress and store the result in register VX
-		if cpu.hasKeyPressed {
-			cpu.v[opcode.X] = cpu.keyPressed
-			logger.Get().Debug("Key pressed", "key", cpu.keyPressed)
+		if c.hasKeyPressed {
+			c.v[opcode.X] = c.keyPressed
+			logger.Get().Debug("Key pressed", "key", c.keyPressed)
 		} else {
-			cpu.pc.Undo()
+			c.pc.Undo()
 			logger.Get().Debug("Waiting for a keypress")
 		}
 
@@ -258,17 +240,17 @@ func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
 	case 0x29:
 		logger.Get().Debug(fmt.Sprintf("LD F, V%d", opcode.X))
 
-		cpu.i = uint16(cpu.v[opcode.X])
+		c.i = uint16(c.v[opcode.X])
 
 	case 0x55: // FX55
 		logger.Get().Debug(fmt.Sprintf("SAVE V%d", opcode.X))
 		for i := uint16(0); i <= x; i++ {
-			cpu.memory.Write(cpu.i+i, cpu.v[i])
+			c.memory.Write(c.i+i, c.v[i])
 		}
 	case 0x65: // FX65
 		logger.Get().Debug(fmt.Sprintf("LOAD V%d", opcode.X))
 		for i := uint16(0); i <= x; i++ {
-			cpu.v[i] = cpu.memory.Read(cpu.i + i)
+			c.v[i] = c.memory.Read(c.i + i)
 		}
 	}
 }

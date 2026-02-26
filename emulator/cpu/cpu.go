@@ -19,7 +19,6 @@ type CPU struct {
 	delayTimer byte
 	soundTimer byte
 
-	cu     *ControlUnit
 	memory *memory.Memory
 
 	pixels  [shared.DisplayHeight][shared.DisplayWidth]bool
@@ -44,7 +43,6 @@ func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
 		delayTimer: 0,
 		soundTimer: 0,
 		memory:     mem,
-		cu:         &ControlUnit{},
 		display:    d,
 		running:    false,
 	}
@@ -68,7 +66,7 @@ func (c *CPU) step() {
 		}
 	}
 
-	c.cu.ExecuteCycle(c) // TODO: remove
+	c.executeCycle()
 	c.display.Render(c.pixels)
 
 	c.pc.Count()
