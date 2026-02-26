@@ -2,20 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
-	"fyne.io/fyne/v2/app"
 	"github.com/xoesae/chip8/emulator/cpu"
-	"github.com/xoesae/chip8/emulator/event"
 	"github.com/xoesae/chip8/emulator/io/display"
 	"github.com/xoesae/chip8/emulator/memory"
 	"github.com/xoesae/chip8/logger"
 )
 
-const MemorySize uint16 = 4096
-
 func main() {
-
 	logger.Init("debug") // debug - info
 
 	romFile := os.Args[1]
@@ -23,24 +19,20 @@ func main() {
 	logger.Get().Debug("Loading ROM " + romFile)
 
 	// memory
-	mem := memory.NewMemory(MemorySize)
+	mem := memory.NewMemory()
 	mem.Setup(romFile)
 
-	// EventBus
-	eventChannel := make(chan event.Event)
+	logger.Get().Info("Starting display")
+	d, err := display.NewDisplay()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer d.Close()
 
 	logger.Get().Debug("Starting emulator")
-	c := cpu.NewCPU(mem, eventChannel)
-	go c.Run(60)
+	c := cpu.NewCPU(mem, d)
 
-	// output
-
-	logger.Get().Info("Starting display")
-	a := app.New()
-	_display := display.NewDisplay(&a, eventChannel)
-	_display.StartEventLoop()
-	_display.Show()
-	_display.Run()
+	c.Run(60)
 
 	//fmt.Println("\nRegisters")
 	//c.PrintRegisters()

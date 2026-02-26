@@ -4,18 +4,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/xoesae/chip8/emulator/shared"
 )
 
 type Memory struct {
-	size   uint16
-	memory []byte
+	memory [shared.MemorySize]byte
 }
 
-func NewMemory(size uint16) *Memory {
-	return &Memory{
-		size:   size,
-		memory: make([]byte, size),
-	}
+func NewMemory() *Memory {
+	return &Memory{}
 }
 
 func (m *Memory) Read(address uint16) byte {
@@ -72,7 +70,7 @@ func (m *Memory) Setup(filename string) {
 }
 
 func (m *Memory) Size() uint16 {
-	return m.size
+	return shared.MemorySize
 }
 
 func (m *Memory) Print() {

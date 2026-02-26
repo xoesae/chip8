@@ -3,8 +3,7 @@ package cpu
 import (
 	"fmt"
 
-	"github.com/xoesae/chip8/emulator/event"
-	"github.com/xoesae/chip8/emulator/io/display"
+	"github.com/xoesae/chip8/emulator/shared"
 	"github.com/xoesae/chip8/logger"
 )
 
@@ -17,6 +16,7 @@ func (c *ControlUnit) fetch(cpu *CPU) Opcode {
 
 	opcode := (high << 8) | low
 
+	// TODO: move this to opcode.go
 	return Opcode{
 		Raw:   opcode,
 		Group: opcode & 0xF000,
@@ -48,10 +48,26 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		logger.Get().Debug("0x2000")
 		return
 	case 0x3000:
-		logger.Get().Debug("0x3000")
+		logger.Get().Debug(fmt.Sprintf("SE V%d, %d", opcode.X, opcode.NN))
+
+		if cpu.v[opcode.X] == opcode.NN {
+			// Ignore next instruction, add +2 on program counter
+			cpu.pc.Count()
+
+			logger.Get().Debug(fmt.Sprintf("V%d == %d", opcode.X, opcode.NN))
+		}
+
 		return
 	case 0x4000:
-		logger.Get().Debug("0x4000")
+		logger.Get().Debug(fmt.Sprintf("SNE V%d, %d", opcode.X, opcode.NN))
+
+		if cpu.v[opcode.X] != opcode.NN {
+			// Ignore next instruction, add +2 on program counter
+			cpu.pc.Count()
+
+			logger.Get().Debug(fmt.Sprintf("V%d != %d", opcode.X, opcode.NN))
+		}
+
 		return
 	case 0x5000:
 		logger.Get().Debug(fmt.Sprintf("SE V%d, V%d", opcode.X, opcode.Y))
@@ -126,19 +142,19 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 					continue
 				}
 
-				x := (vx + col) % display.DisplayWidth
-				y := (vy + row) % display.DisplayHeight
+				x := (vx + col) % shared.DisplayWidth
+				y := (vy + row) % shared.DisplayHeight
 
 				// [0, 0, 0, 1, 1]
 				// [0, 1, 1, 0, 0]
 				// [0, 1, 1, 0, 0]
 				// [0, 1, 1, 0, 0]
 
-				if cpu.display[y][x] {
+				if cpu.pixels[y][x] {
 					collision = true
 				}
 
-				cpu.display[y][x] = !cpu.display[y][x]
+				cpu.pixels[y][x] = !cpu.pixels[y][x]
 			}
 		}
 
@@ -147,10 +163,6 @@ func (c *ControlUnit) ExecuteCycle(cpu *CPU) {
 		} else {
 			cpu.v[0xF] = 0
 		}
-
-		cpu.emitEvent(event.DisplayUpdatedEvent{
-			Pixels: cpu.display,
-		})
 
 		return
 	case 0xE000:
@@ -166,12 +178,11 @@ func (c *ControlUnit) handle0Group(cpu *CPU, opcode Opcode) {
 	switch opcode.Raw & 0x00FF {
 	case 0xE0:
 		logger.Get().Debug("CLEAR")
-		for y := 0; y < display.DisplayHeight; y++ {
-			for x := 0; x < display.DisplayWidth; x++ {
-				cpu.display[y][x] = false
+		for y := 0; y < shared.DisplayHeight; y++ {
+			for x := 0; x < shared.DisplayWidth; x++ {
+				cpu.pixels[y][x] = false
 			}
 		}
-		cpu.emitEvent(event.DisplayClearEvent{})
 	case 0xEE:
 		logger.Get().Debug("Return")
 	}
@@ -233,7 +244,22 @@ func (c *ControlUnit) handleFGroup(cpu *CPU, opcode Opcode) {
 	switch opcode.NN {
 	case 0x0A:
 		logger.Get().Debug(fmt.Sprintf("LD V%d, K", opcode.X))
+
+		// Wait for a keypress and store the result in register VX
+		if cpu.hasKeyPressed {
+			cpu.v[opcode.X] = cpu.keyPressed
+			logger.Get().Debug("Key pressed", "key", cpu.keyPressed)
+		} else {
+			cpu.pc.Undo()
+			logger.Get().Debug("Waiting for a keypress")
+		}
+
 		return
+	case 0x29:
+		logger.Get().Debug(fmt.Sprintf("LD F, V%d", opcode.X))
+
+		cpu.i = uint16(cpu.v[opcode.X])
+
 	case 0x55: // FX55
 		logger.Get().Debug(fmt.Sprintf("SAVE V%d", opcode.X))
 		for i := uint16(0); i <= x; i++ {

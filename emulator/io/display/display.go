@@ -1,126 +1,137 @@
 package display
 
 import (
-	"image/color"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
-	"github.com/xoesae/chip8/emulator/event"
-	"github.com/xoesae/chip8/logger"
+	"github.com/veandco/go-sdl2/sdl"
+	"github.com/xoesae/chip8/emulator/shared"
 )
 
-const (
-	DisplayWidth  = 64
-	DisplayHeight = 32
-	PixelSize     = 10
-)
+type KeyEvent struct {
+	Key     uint8
+	Pressed bool
+}
 
 type Display struct {
-	app    *fyne.App
-	window *fyne.Window
-	pixels [][]*canvas.Rectangle
-	grid   *fyne.Container
-	events chan event.Event
+	window   *sdl.Window
+	renderer *sdl.Renderer
 }
 
-func NewDisplay(a *fyne.App, eventsChannel chan event.Event) *Display {
-	window := (*a).NewWindow("CHIP-8")
-	window.Resize(fyne.NewSize(DisplayWidth*PixelSize, DisplayHeight*PixelSize))
-
-	pixels := make([][]*canvas.Rectangle, DisplayHeight)
-	grid := container.NewGridWithColumns(DisplayWidth)
-
-	for y := 0; y < DisplayHeight; y++ {
-		pixels[y] = make([]*canvas.Rectangle, DisplayWidth)
-
-		for x := 0; x < DisplayWidth; x++ {
-			rect := canvas.NewRectangle(color.Black)
-			rect.SetMinSize(fyne.NewSize(PixelSize, PixelSize))
-			pixels[y][x] = rect
-			grid.Add(rect)
-		}
+func NewDisplay() (*Display, error) {
+	err := sdl.Init(sdl.INIT_VIDEO)
+	if err != nil {
+		return nil, err
 	}
 
-	d := &Display{
-		app:    a,
-		window: &window,
-		pixels: pixels,
-		grid:   grid,
-		events: eventsChannel,
+	window, err := sdl.CreateWindow(
+		"CHIP-8",
+		sdl.WINDOWPOS_UNDEFINED,
+		sdl.WINDOWPOS_UNDEFINED,
+		shared.DisplayWidth*shared.PixelSize,
+		shared.DisplayHeight*shared.PixelSize,
+		sdl.WINDOW_SHOWN,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	window.SetContent(grid)
-
-	return d
-}
-
-func (d *Display) Events() chan<- event.Event {
-	return d.events
-}
-
-func (d *Display) StartEventLoop() {
-	go d.eventLoop()
-}
-
-func (d *Display) eventLoop() {
-	for ev := range d.events {
-		switch ev.(type) {
-		case event.DisplayClearEvent:
-			d.clearDisplay()
-		case event.DisplayUpdatedEvent:
-			evt := ev.(event.DisplayUpdatedEvent)
-			d.updatePixel(evt)
-		default:
-			logger.Get().Debug("Event ignored")
-		}
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Display{
+		window:   window,
+		renderer: renderer,
+	}, nil
 }
 
-func (d *Display) clearDisplay() {
-	fyne.Do(func() {
-		for i := 0; i < DisplayHeight; i++ {
-			for j := 0; j < DisplayWidth; j++ {
-				d.pixels[i][j].FillColor = color.Black
-				//d.pixels[i][j].Refresh()
-			}
-		}
+func (d *Display) Render(pixels [shared.DisplayHeight][shared.DisplayWidth]bool) {
+	d.renderer.SetDrawColor(0, 0, 0, 255)
+	d.renderer.Clear()
 
-		d.grid.Refresh()
-	})
-
-	logger.Get().Debug("Display clear")
-}
-
-func (d *Display) updatePixel(evt event.DisplayUpdatedEvent) {
-	fyne.Do(func() {
-		for i := 0; i < DisplayHeight; i++ {
-			for j := 0; j < DisplayWidth; j++ {
-				_color := color.Black
-				if evt.Pixels[i][j] {
-					_color = color.White
+	for y := range pixels {
+		for x := range pixels[y] {
+			if pixels[y][x] {
+				rect := sdl.Rect{
+					X: int32(x * shared.PixelSize),
+					Y: int32(y * shared.PixelSize),
+					W: shared.PixelSize,
+					H: shared.PixelSize,
 				}
 
-				d.pixels[i][j].FillColor = _color
-				//d.pixels[i][j].Refresh()
+				d.renderer.SetDrawColor(255, 255, 255, 255)
+				d.renderer.FillRect(&rect)
 			}
 		}
+	}
 
-		d.grid.Refresh()
-	})
-
-	logger.Get().Debug("Display updated")
+	d.renderer.Present()
 }
 
-func (d *Display) Show() {
-	(*d.window).Show()
-}
+func (d *Display) PollEvents() ([]KeyEvent, bool) {
+	var events []KeyEvent
+	running := true
 
-func (d *Display) Run() {
-	(*d.window).ShowAndRun()
+	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch e := event.(type) {
+
+		case *sdl.QuitEvent:
+			running = false
+
+		case *sdl.KeyboardEvent:
+			key, ok := mapKey(e.Keysym.Sym)
+			if ok {
+				events = append(events, KeyEvent{
+					Key:     key,
+					Pressed: e.Type == sdl.KEYDOWN,
+				})
+			}
+		}
+	}
+
+	return events, running
 }
 
 func (d *Display) Close() {
-	close(d.events)
-	(*d.window).Close()
+	d.renderer.Destroy()
+	d.window.Destroy()
+	sdl.Quit()
+}
+
+func mapKey(key sdl.Keycode) (uint8, bool) {
+	switch key {
+	case sdl.K_1:
+		return 0x1, true
+	case sdl.K_2:
+		return 0x2, true
+	case sdl.K_3:
+		return 0x3, true
+	case sdl.K_4:
+		return 0xC, true
+	case sdl.K_q:
+		return 0x4, true
+	case sdl.K_w:
+		return 0x5, true
+	case sdl.K_e:
+		return 0x6, true
+	case sdl.K_r:
+		return 0xD, true
+	case sdl.K_a:
+		return 0x7, true
+	case sdl.K_s:
+		return 0x8, true
+	case sdl.K_d:
+		return 0x9, true
+	case sdl.K_f:
+		return 0xE, true
+	case sdl.K_z:
+		return 0xA, true
+	case sdl.K_x:
+		return 0x0, true
+	case sdl.K_c:
+		return 0xB, true
+	case sdl.K_v:
+		return 0xF, true
+	}
+
+	return 0, false
 }

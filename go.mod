@@ -2,7 +2,10 @@ module github.com/xoesae/chip8
 
 go 1.25.1
 
-require fyne.io/fyne/v2 v2.7.0
+require (
+	fyne.io/fyne/v2 v2.7.0
+	github.com/veandco/go-sdl2 v0.4.40
+)
 
 require (
 	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect

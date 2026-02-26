@@ -15,6 +15,10 @@ func (p *PC) Count() {
 	p.current += 2
 }
 
+func (p *PC) Undo() {
+	p.current -= 2
+}
+
 func (p *PC) JumpTo(address uint16) {
 	// address + offset
 	// -2 is to prevent the cpu ignore instruction[address] on the next cycle

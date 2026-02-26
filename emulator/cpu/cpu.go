@@ -4,45 +4,49 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xoesae/chip8/emulator/event"
 	"github.com/xoesae/chip8/emulator/io/display"
 	"github.com/xoesae/chip8/emulator/memory"
+	"github.com/xoesae/chip8/emulator/shared"
 )
 
 type CPU struct {
-	v          [16]byte // V0-VF registers
-	i          uint16   // address register
-	pc         *PC      // program counter
-	stack      [16]uint16
-	sp         byte // StackPointer
+	// internal
+	v          [16]byte   // V0-VF registers
+	i          uint16     // address register
+	pc         *PC        // program counter
+	stack      [16]uint16 // stack
+	sp         byte       // StackPointer
 	delayTimer byte
 	soundTimer byte
 
-	memory  *memory.Memory
-	cu      *ControlUnit
-	display [display.DisplayHeight][display.DisplayWidth]bool
+	cu     *ControlUnit
+	memory *memory.Memory
 
-	eventChannel chan event.Event
+	pixels  [shared.DisplayHeight][shared.DisplayWidth]bool
+	display *display.Display
+
+	hasKeyPressed bool
+	keyPressed    uint8
 
 	running bool
 }
 
-func NewCPU(mem *memory.Memory, eventChan chan event.Event) *CPU {
+func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
 	i := uint16(0x200)
 
 	pc := NewPC(i)
 
 	return &CPU{
-		v:            [16]byte{},
-		i:            i,
-		pc:           pc,
-		stack:        [16]uint16{},
-		delayTimer:   0,
-		soundTimer:   0,
-		memory:       mem,
-		cu:           &ControlUnit{},
-		eventChannel: eventChan,
-		running:      false,
+		v:          [16]byte{},
+		i:          i,
+		pc:         pc,
+		stack:      [16]uint16{},
+		delayTimer: 0,
+		soundTimer: 0,
+		memory:     mem,
+		cu:         &ControlUnit{},
+		display:    d,
+		running:    false,
 	}
 }
 
@@ -53,8 +57,22 @@ func (c *CPU) step() {
 		c.running = false
 	}
 
-	c.cu.ExecuteCycle(c)
+	keyEvents, running := c.display.PollEvents()
+
+	c.running = running
+	for _, e := range keyEvents {
+		if e.Pressed {
+			c.hasKeyPressed = true
+			c.keyPressed = e.Key
+			break
+		}
+	}
+
+	c.cu.ExecuteCycle(c) // TODO: remove
+	c.display.Render(c.pixels)
+
 	c.pc.Count()
+	c.hasKeyPressed = false
 
 	if c.pc.Current() >= memorySize {
 		c.running = false
@@ -69,10 +87,6 @@ func (c *CPU) updateTimers() {
 	if c.soundTimer > 0 {
 		c.soundTimer--
 	}
-}
-
-func (c *CPU) emitEvent(e event.Event) {
-	c.eventChannel <- e
 }
 
 func (c *CPU) Run(fps int) {
