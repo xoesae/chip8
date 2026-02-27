@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/xoesae/chip8/emulator/cpu"
-	"github.com/xoesae/chip8/emulator/io/display"
+	"github.com/xoesae/chip8/emulator/chip"
 	"github.com/xoesae/chip8/emulator/memory"
+	"github.com/xoesae/chip8/emulator/platform"
 	"github.com/xoesae/chip8/logger"
 )
 
@@ -23,14 +23,14 @@ func main() {
 	mem.Setup(romFile)
 
 	logger.Get().Info("Starting display")
-	d, err := display.NewDisplay()
+	p, err := platform.NewPlatform()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer d.Close()
+	defer p.Close()
 
 	logger.Get().Debug("Starting emulator")
-	c := cpu.NewCPU(mem, d)
+	c := chip.NewChip(mem, p)
 
 	c.Run(60)
 

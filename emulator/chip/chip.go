@@ -1,15 +1,15 @@
-package cpu
+package chip
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/xoesae/chip8/emulator/io/display"
 	"github.com/xoesae/chip8/emulator/memory"
+	"github.com/xoesae/chip8/emulator/platform"
 	"github.com/xoesae/chip8/emulator/shared"
 )
 
-type CPU struct {
+type Chip struct {
 	// internal
 	v          [16]byte   // V0-VF registers
 	i          uint16     // address register
@@ -19,10 +19,10 @@ type CPU struct {
 	delayTimer byte
 	soundTimer byte
 
-	memory *memory.Memory
+	memory   *memory.Memory
+	platform *platform.Platform
 
-	pixels  [shared.DisplayHeight][shared.DisplayWidth]bool
-	display *display.Display
+	pixels [shared.DisplayHeight][shared.DisplayWidth]bool
 
 	hasKeyPressed bool
 	keyPressed    uint8
@@ -30,12 +30,12 @@ type CPU struct {
 	running bool
 }
 
-func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
+func NewChip(mem *memory.Memory, p *platform.Platform) *Chip {
 	i := uint16(0x200)
 
 	pc := NewPC(i)
 
-	return &CPU{
+	return &Chip{
 		v:          [16]byte{},
 		i:          i,
 		pc:         pc,
@@ -43,19 +43,19 @@ func NewCPU(mem *memory.Memory, d *display.Display) *CPU {
 		delayTimer: 0,
 		soundTimer: 0,
 		memory:     mem,
-		display:    d,
+		platform:   p,
 		running:    false,
 	}
 }
 
-func (c *CPU) step() {
+func (c *Chip) step() {
 	memorySize := c.memory.Size()
 
 	if c.pc.Current() >= memorySize-1 {
 		c.running = false
 	}
 
-	keyEvents, running := c.display.PollEvents()
+	keyEvents, running := c.platform.PollEvents()
 
 	c.running = running
 	for _, e := range keyEvents {
@@ -67,7 +67,7 @@ func (c *CPU) step() {
 	}
 
 	c.executeCycle()
-	c.display.Render(c.pixels)
+	c.platform.Render(c.pixels)
 
 	c.pc.Count()
 	c.hasKeyPressed = false
@@ -77,7 +77,7 @@ func (c *CPU) step() {
 	}
 }
 
-func (c *CPU) updateTimers() {
+func (c *Chip) updateTimers() {
 	if c.delayTimer > 0 {
 		c.delayTimer--
 	}
@@ -87,7 +87,7 @@ func (c *CPU) updateTimers() {
 	}
 }
 
-func (c *CPU) Run(fps int) {
+func (c *Chip) Run(fps int) {
 	c.running = true
 
 	cpuTick := time.NewTicker(time.Second / time.Duration(fps)) // FPS = instructions per second
@@ -106,7 +106,7 @@ func (c *CPU) Run(fps int) {
 	}
 }
 
-func (c *CPU) PrintRegisters() {
+func (c *Chip) PrintRegisters() {
 	for i := 0; i < 16; i++ {
 		fmt.Printf("V%X = 0x%02X  ", i, c.v[i])
 		if (i+1)%4 == 0 {

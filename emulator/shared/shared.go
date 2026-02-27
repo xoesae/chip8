@@ -6,3 +6,8 @@ const (
 	DisplayHeight        = 32
 	PixelSize            = 10
 )
+
+type KeyEvent struct {
+	Key     uint8
+	Pressed bool
+}

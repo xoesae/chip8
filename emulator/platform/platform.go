@@ -1,21 +1,16 @@
-package display
+package platform
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/xoesae/chip8/emulator/shared"
 )
 
-type KeyEvent struct {
-	Key     uint8
-	Pressed bool
-}
-
-type Display struct {
+type Platform struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
 }
 
-func NewDisplay() (*Display, error) {
+func NewPlatform() (*Platform, error) {
 	err := sdl.Init(sdl.INIT_VIDEO)
 	if err != nil {
 		return nil, err
@@ -38,15 +33,15 @@ func NewDisplay() (*Display, error) {
 		return nil, err
 	}
 
-	return &Display{
+	return &Platform{
 		window:   window,
 		renderer: renderer,
 	}, nil
 }
 
-func (d *Display) Render(pixels [shared.DisplayHeight][shared.DisplayWidth]bool) {
-	d.renderer.SetDrawColor(0, 0, 0, 255)
-	d.renderer.Clear()
+func (p *Platform) Render(pixels [shared.DisplayHeight][shared.DisplayWidth]bool) {
+	p.renderer.SetDrawColor(0, 0, 0, 255)
+	p.renderer.Clear()
 
 	for y := range pixels {
 		for x := range pixels[y] {
@@ -58,17 +53,17 @@ func (d *Display) Render(pixels [shared.DisplayHeight][shared.DisplayWidth]bool)
 					H: shared.PixelSize,
 				}
 
-				d.renderer.SetDrawColor(255, 255, 255, 255)
-				d.renderer.FillRect(&rect)
+				p.renderer.SetDrawColor(255, 255, 255, 255)
+				p.renderer.FillRect(&rect)
 			}
 		}
 	}
 
-	d.renderer.Present()
+	p.renderer.Present()
 }
 
-func (d *Display) PollEvents() ([]KeyEvent, bool) {
-	var events []KeyEvent
+func (p *Platform) PollEvents() ([]shared.KeyEvent, bool) {
+	var events []shared.KeyEvent
 	running := true
 
 	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -80,7 +75,7 @@ func (d *Display) PollEvents() ([]KeyEvent, bool) {
 		case *sdl.KeyboardEvent:
 			key, ok := mapKey(e.Keysym.Sym)
 			if ok {
-				events = append(events, KeyEvent{
+				events = append(events, shared.KeyEvent{
 					Key:     key,
 					Pressed: e.Type == sdl.KEYDOWN,
 				})
@@ -91,9 +86,9 @@ func (d *Display) PollEvents() ([]KeyEvent, bool) {
 	return events, running
 }
 
-func (d *Display) Close() {
-	d.renderer.Destroy()
-	d.window.Destroy()
+func (p *Platform) Close() {
+	p.renderer.Destroy()
+	p.window.Destroy()
 	sdl.Quit()
 }
 

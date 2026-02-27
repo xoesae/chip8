@@ -1,4 +1,4 @@
-package cpu
+package opcode
 
 type Opcode struct {
 	Raw uint16

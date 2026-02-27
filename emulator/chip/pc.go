@@ -1,4 +1,4 @@
-package cpu
+package chip
 
 type PC struct {
 	current, i uint16
